@@ -16,6 +16,8 @@ export default function RootLayout({
       <body className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
         <Navbar />
         {children}
+      <footer />
+
       </body>
     </html>
   );
