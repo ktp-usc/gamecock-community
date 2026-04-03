@@ -23,9 +23,9 @@ datasource db {
  * updatedAt:   date the volunteer was updated
  */
 model Volunteer {
-  id        String  @id @default(uuid())
-  firstName String?
-  lastName  String?
+  id        String @id @default(uuid())
+  firstName String
+  lastName  String
 
   timeEntries TimeEntry[]
 
