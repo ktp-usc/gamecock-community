@@ -9,7 +9,8 @@
     "postinstall": "prisma generate",
     "lint": "eslint",
     "db:seed": "ts-node prisma/seed.ts",
-    "test:volunteers": "tsx scripts/test-volunteers.ts"
+    "test:volunteers": "tsx scripts/test-volunteers.ts",
+    "test:time-entries": "tsx scripts/test-time-entries.ts"
   },
   "dependencies": {
     "@prisma/adapter-neon": "^7.5.0",
