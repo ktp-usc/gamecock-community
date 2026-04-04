@@ -4,10 +4,56 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../lib/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+/**
+ * Volunteer table
+ * Defines the attributes of a community shop volunteer
+ * Attributes
+ * id:          unique identifier
+ * firstName:   first name of the volunteer
+ * lastName:    last name of the volunteer
+ * timeEntries: table of clock in and clock out times
+ * createdAt:   date that the volunteer was added
+ * updatedAt:   date the volunteer was updated
+ */
+model Volunteer {
+  id        String @id @default(uuid())
+  firstName String
+  lastName  String
+
+  timeEntries TimeEntry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/**
+ * Time entry table
+ * Defines the attributes of a volunteer session
+ * Attributes
+ * id:          unique identifier
+ * volunteerId: unique identifier for the volunteer
+ * clockIn:     time when the volunteer clocked in for their shift
+ * clockOut:    time when the volunteer clocked out for their shift
+ * createdAt:   time when this entry was created
+ * volunteer:   relation between the Volunteer table and TimeEntry table
+ */
+model TimeEntry {
+  id          String @id @default(uuid())
+  volunteerId String
+
+  clockIn  DateTime
+  clockOut DateTime?
+
+  createdAt DateTime @default(now())
+
+  volunteer Volunteer @relation(fields: [volunteerId], references: [id])
+
+  @@index([volunteerId]) // improves query efficiency
 }
