@@ -48,3 +48,6 @@ gen
 
 
 /lib/generated/prisma
+
+# local import data
+scripts/Volunteer_Names_Cleaned.csv
