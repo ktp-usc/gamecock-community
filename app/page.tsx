@@ -1,80 +1,83 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
 export default function Home() {
-  const time = new Date().toLocaleTimeString();
+  const [time, setTime] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [selectedName, setSelectedName] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+    setTime(new Date().toLocaleTimeString());
+
+    const interval = setInterval(() => {
+      setTime(new Date().toLocaleTimeString());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  function handleClock(action: "Clock In" | "Clock Out") {
+    if (!selectedName) return;
+    alert(`${action} clicked for ${selectedName}`);
+  }
+
+  const canClick = Boolean(selectedName);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Gamecock Community Shop</h1>
-        <h2 style={styles.subtitle}>Volunteer Clock-In</h2>
+    <main className="min-h-screen bg-[#f4f4f4] flex justify-center items-start pt-20">
+      <div className="bg-white w-[550px] p-12 rounded-2xl shadow-lg text-center">
+        <h1 className="text-[#7a1c1c] text-2xl font-semibold mb-2">
+          Gamecock Community Shop
+        </h1>
 
-        <div style={styles.time}>{time}</div>
+        <h2 className="text-lg mb-2">Volunteer Clock-In</h2>
 
-        <hr style={{ margin: "20px 0" }} />
+        <div className="text-4xl mb-2 min-h-[48px]">
+          {mounted ? time : " "}
+        </div>
 
-        <label style={styles.label}>Select Your Name</label>
+        <hr className="my-5" />
 
-        <select style={styles.select}>
-          <option>Select your name</option>
-          <option>John Doe</option>
-          <option>Jane Smith</option>
+        <label className="block mb-2 text-lg">Select Your Name</label>
+
+        <select
+          className="w-full p-3 mb-6 border rounded-lg cursor-pointer"
+          value={selectedName}
+          onChange={(e) => setSelectedName(e.target.value)}
+        >
+          <option value="">Select your name</option>
+          <option value="John Doe">John Doe</option>
+          <option value="Jane Smith">Jane Smith</option>
         </select>
 
-        <div style={styles.buttonContainer}>
-          <button style={styles.button}>Clock In</button>
-          <button style={styles.button}>Clock Out</button>
+        <div className="flex justify-between gap-4">
+          <button
+            onClick={() => handleClock("Clock In")}
+            disabled={!canClick}
+            className={`w-1/2 py-3 rounded-lg text-white transition ${
+              canClick
+                ? "bg-[#7a1c1c] hover:bg-[#651616] cursor-pointer"
+                : "bg-[#7a1c1c]/50 cursor-not-allowed"
+            }`}
+          >
+            Clock In
+          </button>
+
+          <button
+            onClick={() => handleClock("Clock Out")}
+            disabled={!canClick}
+            className={`w-1/2 py-3 rounded-lg text-white transition ${
+              canClick
+                ? "bg-[#7a1c1c] hover:bg-[#651616] cursor-pointer"
+                : "bg-[#7a1c1c]/50 cursor-not-allowed"
+            }`}
+          >
+            Clock Out
+          </button>
         </div>
       </div>
-    </div>
+    </main>
   );
 }
-
-const styles = {
-  page: {
-    height: "100vh",
-    backgroundColor: "#f4f4f4",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  card: {
-    backgroundColor: "white",
-    padding: "30px",
-    borderRadius: "10px",
-    width: "400px",
-    textAlign: "center" as const,
-    boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-  },
-  title: {
-    color: "#7a1c1c",
-    marginBottom: "10px",
-  },
-  subtitle: {
-    marginBottom: "10px",
-  },
-  time: {
-    fontSize: "28px",
-    marginBottom: "10px",
-  },
-  label: {
-    display: "block",
-    marginBottom: "10px",
-  },
-  select: {
-    width: "100%",
-    padding: "10px",
-    marginBottom: "20px",
-  },
-  buttonContainer: {
-    display: "flex",
-    justifyContent: "space-between",
-  },
-  button: {
-    backgroundColor: "#7a1c1c",
-    color: "white",
-    border: "none",
-    padding: "12px",
-    width: "48%",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-};
