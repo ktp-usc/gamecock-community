@@ -177,7 +177,7 @@ export default function Home() {
             value={selectedVolunteerId}
             onChange={(event) => setSelectedVolunteerId(event.target.value)}
             disabled={isLoading || filteredVolunteers.length === 0}
-            className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-lg outline-none transition focus:border-[#4a90e2] focus:ring-4 focus:ring-[#4a90e2]/15 disabled:cursor-not-allowed disabled:bg-slate-100"
+            className="cursor-pointer w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-lg outline-none transition focus:border-[#4a90e2] focus:ring-4 focus:ring-[#4a90e2]/15 disabled:cursor-not-allowed disabled:bg-slate-100"
           >
             <option value="">
               {isLoading
@@ -223,7 +223,7 @@ export default function Home() {
               )
             }
             disabled={!selectedVolunteerId || isSubmitting}
-            className="w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
+            className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
           >
             Clock In
           </button>
@@ -238,7 +238,7 @@ export default function Home() {
               )
             }
             disabled={!selectedVolunteerId || isSubmitting}
-            className="w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
+            className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
           >
             Clock Out
           </button>
