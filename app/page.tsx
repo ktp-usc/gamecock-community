@@ -211,7 +211,7 @@ export default function Home() {
   }
 
   return (
-    <main className="bg-[#f4f4f4] px-4 py-8 sm:px-6 sm:py-10">
+    <main className="bg-[#f4f4f4] px-4 py-10 sm:px-6 sm:py-14">
       <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-[28px] border-slate-200 bg-white text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
         <CardHeader className="items-center gap-2 px-6 pt-7 sm:px-10 sm:pt-8">
           <CardTitle className="text-3xl text-[#7a1c1c] sm:text-4xl">
