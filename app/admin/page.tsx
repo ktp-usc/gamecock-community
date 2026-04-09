@@ -14,6 +14,13 @@ export default function AdminPage() {
   const [entries, setEntries] = useState<VolunteerLogEntry[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [newVolunteerName, setNewVolunteerName] = useState("");
+  const currentMonthYear = new Date().toLocaleString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+  
 
   function refreshEntries() {
     setEntries(loadEntries().slice().reverse());
@@ -92,23 +99,32 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black px-4 py-10 text-neutral-900">
+    <main className="min-h-screen bg-[#f4f4f4] px-4 py-10 text-neutral-900">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
         <section className="admin-card w-full">
           <div className="flex flex-col items-center gap-2 text-center">
             <h1 className="text-4xl font-bold tracking-tight text-[#a61c1c] sm:text-5xl">
               Volunteer Time Log
             </h1>
-            <p className="text-xl text-neutral-700">March 2026</p>
+            <p className="text-xl text-neutral-700">{currentMonthYear}</p>
           </div>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full gap-3 sm:max-w-md">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search volunteer name"
               className="w-full rounded-2xl border border-neutral-300 bg-white px-5 py-3 text-lg outline-none focus:border-[#a61c1c] focus:ring-4 focus:ring-[#a61c1c]/10 sm:max-w-sm"
             />
+            <button
+               onClick={() => setShowModal(true)}
+              className="rounded-2xl bg-[#a61c1c] px-5 py-3 text-sm font-semibold text-white hover:bg-[#8f1616]"
+                >
+                 Add New Volunteer
+              </button>
+          </div>
+              
 
             <div className="flex gap-3">
               <button
@@ -160,6 +176,46 @@ export default function AdminPage() {
               </table>
             </div>
           </div>
+
+          {showModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <h2 className="text-2xl font-bold text-[#a61c1c]">
+        Add New Volunteer
+      </h2>
+
+      <input
+        value={newVolunteerName}
+        onChange={(e) => setNewVolunteerName(e.target.value)}
+        placeholder="Volunteer name"
+        className="mt-4 w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-[#a61c1c]"
+      />
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          onClick={() => {
+            setShowModal(false);
+            setNewVolunteerName("");
+          }}
+          className="rounded-xl bg-neutral-300 px-4 py-2"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={() => {
+            console.log("New volunteer:", newVolunteerName);
+            setShowModal(false);
+            setNewVolunteerName("");
+          }}
+          className="rounded-xl bg-[#a61c1c] px-4 py-2 text-white"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         </section>
       </div>
     </main>
