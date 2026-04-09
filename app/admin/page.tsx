@@ -54,6 +54,41 @@ export default function AdminPage() {
     setSearch("");
   }
 
+  async function handleAddVolunteer() {
+    const fullName = newVolunteerName.trim();
+  
+    if (!fullName) return;
+  
+    const parts = fullName.split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(" ");
+  
+    if (!lastName) {
+      setError("Please enter a first and last name.");
+      return;
+    }
+  
+    const res = await fetch("/api/volunteers", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+      }),
+    });
+  
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Failed to add volunteer.");
+      return;
+    }
+  
+    setNewVolunteerName("");
+    setShowModal(false);
+  }
+
   const filteredEntries = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return entries;
@@ -203,11 +238,7 @@ export default function AdminPage() {
         </button>
 
         <button
-          onClick={() => {
-            console.log("New volunteer:", newVolunteerName);
-            setShowModal(false);
-            setNewVolunteerName("");
-          }}
+          onClick={handleAddVolunteer}
           className="rounded-xl bg-[#a61c1c] px-4 py-2 text-white"
         >
           Add
