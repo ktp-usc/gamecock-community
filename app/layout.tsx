@@ -3,7 +3,6 @@ import "./globals.css";
 import React from "react";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
-import { QueryProvider } from "@/components/query-provider";
 
 
 export const metadata: Metadata = {
@@ -17,11 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
-        <QueryProvider>
           <Navbar />
           {children}
           <Footer />
-        </QueryProvider>
       </body>
     </html>
   );
