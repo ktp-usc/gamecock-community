@@ -106,7 +106,7 @@ function ComboboxItem({
     <ComboboxPrimitive.Item
       data-slot="combobox-item"
       className={cn(
-        "flex w-full cursor-default items-center gap-3 rounded-xl px-3 py-3 text-left text-base text-slate-950 outline-none select-none data-[highlighted]:bg-slate-100",
+        "flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left text-base text-slate-950 outline-none select-none data-[highlighted]:bg-slate-100",
         className,
       )}
       {...props}

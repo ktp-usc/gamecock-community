@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Clock3 } from "lucide-react";
+import { toast } from "sonner";
 
 import type { VolunteerRecord } from "@/lib/api/volunteers";
 import { isOpenTimeEntry, type TimeEntryRecord } from "@/lib/time-entries";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Combobox,
   ComboboxContent,
@@ -12,6 +23,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
+import { Separator } from "@/components/ui/separator";
 
 type VolunteerResponse = {
   volunteers?: VolunteerRecord[];
@@ -27,8 +39,6 @@ type TimeEntriesResponse = {
   error?: string;
 };
 
-type StatusTone = "clock-in" | "clock-out" | "";
-
 function getVolunteerLabel(volunteer: VolunteerRecord) {
   return `${volunteer.firstName} ${volunteer.lastName}`;
 }
@@ -43,8 +53,6 @@ export default function Home() {
     useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusTone, setStatusTone] = useState<StatusTone>("");
 
   useEffect(() => {
     setTime(new Date().toLocaleTimeString());
@@ -162,7 +170,7 @@ export default function Home() {
   async function handleClockAction(
     endpoint: "/api/time-entries/clock-in" | "/api/time-entries/clock-out",
     actionLabel: "Clocked in" | "Clocked out",
-    tone: Exclude<StatusTone, "">,
+    nextClockedInState: boolean,
   ) {
     if (!selectedVolunteerId) {
       return;
@@ -170,9 +178,6 @@ export default function Home() {
 
     try {
       setIsSubmitting(true);
-      setError("");
-      setStatusMessage("");
-      setStatusTone("");
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -192,130 +197,135 @@ export default function Home() {
         ? getVolunteerLabel(selectedVolunteer)
         : "Volunteer";
 
-      setStatusMessage(`${actionLabel}: ${volunteerName}`);
-      setStatusTone(tone);
-      setIsSelectedVolunteerClockedIn(tone === "clock-in");
+      toast.success(`${actionLabel}: ${volunteerName}`);
+      setIsSelectedVolunteerClockedIn(nextClockedInState);
     } catch (submitError) {
-      setError(
+      toast.error(
         submitError instanceof Error
           ? submitError.message
           : "Unable to save time entry.",
       );
-      setStatusTone("");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main className="min-h-screen bg-[#f4f4f4] px-4 py-10 sm:px-6 sm:py-16">
-      <div className="mx-auto w-full max-w-3xl rounded-[32px] border border-[#4a90e2] bg-white p-6 text-center shadow-[0_14px_30px_rgba(0,0,0,0.12)] sm:p-10">
-        <h1 className="text-3xl font-semibold text-[#7a1c1c] sm:text-5xl">
-          Gamecock Community Shop
-        </h1>
+    <main className="bg-[#f4f4f4] px-4 py-8 sm:px-6 sm:py-10">
+      <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-[28px] border-slate-200 bg-white text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+        <CardHeader className="items-center gap-2 px-6 pt-7 sm:px-10 sm:pt-8">
+          <CardTitle className="text-3xl text-[#7a1c1c] sm:text-4xl">
+            Gamecock Community Shop
+          </CardTitle>
+          <p className="text-xl font-semibold text-slate-950 sm:text-3xl">
+            Volunteer Clock-In
+          </p>
+          <CardDescription className="mx-auto max-w-xl text-center text-sm leading-6 text-slate-600 sm:text-base">
+            Select your name, then clock in or clock out for your shift.
+          </CardDescription>
+        </CardHeader>
 
-        <h2 className="mt-6 text-2xl font-semibold text-slate-950 sm:text-4xl">
-          Volunteer Clock-In
-        </h2>
+        <CardContent className="space-y-6 px-6 py-6 sm:px-10 sm:py-8">
+          <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-center shadow-sm">
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 sm:text-sm">
+              <Clock3 className="size-4 text-[#7a1c1c]" />
+              Current Time
+            </div>
+            <div className="mt-2 text-4xl font-light tracking-tight text-slate-950 sm:text-5xl">
+              {time || "--:--:--"}
+            </div>
+          </div>
 
-        <div className="mt-6 text-4xl font-light text-slate-950 sm:text-6xl">
-          {time || "--:--:--"}
-        </div>
+          <Separator />
 
-        <hr className="my-8 border-slate-200" />
+          <div className="text-left">
+            <label
+              htmlFor="volunteer-combobox"
+              className="mb-3 block text-lg font-semibold text-slate-950 sm:text-xl"
+            >
+              Select Your Name
+            </label>
+            <p className="mb-4 text-sm leading-6 text-slate-600">
+              Start typing to search for your record, then choose your name from the list.
+            </p>
 
-        <div className="text-left">
-          <label
-            htmlFor="volunteer-combobox"
-            className="mb-3 block text-2xl font-semibold text-slate-950"
-          >
-            Select Your Name
-          </label>
-
-          <Combobox
-            items={sortedVolunteers}
-            value={selectedVolunteer ?? null}
-            onValueChange={(volunteer) =>
-              setSelectedVolunteerId(volunteer?.id ?? "")
-            }
-            itemToStringLabel={getVolunteerLabel}
-            itemToStringValue={(volunteer) => volunteer.id}
-            disabled={isLoading || sortedVolunteers.length === 0}
-            name="volunteer"
-            autoHighlight
-          >
-            <ComboboxInput
-              id="volunteer-combobox"
-              placeholder={
-                isLoading
-                  ? "Loading volunteers..."
-                  : "Search and choose your name"
+            <Combobox
+              items={sortedVolunteers}
+              value={selectedVolunteer ?? null}
+              onValueChange={(volunteer) =>
+                setSelectedVolunteerId(volunteer?.id ?? "")
               }
-              aria-label="Select your name"
-            />
-            <ComboboxContent>
-              <ComboboxEmpty>No matching volunteers found.</ComboboxEmpty>
-              <ComboboxList>
-                {(volunteer) => (
-                  <ComboboxItem key={volunteer.id} value={volunteer}>
-                    {getVolunteerLabel(volunteer)}
-                  </ComboboxItem>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
-        </div>
+              itemToStringLabel={getVolunteerLabel}
+              itemToStringValue={(volunteer) => volunteer.id}
+              disabled={isLoading || sortedVolunteers.length === 0}
+              name="volunteer"
+              autoHighlight
+            >
+              <ComboboxInput
+                id="volunteer-combobox"
+                placeholder={
+                  isLoading
+                    ? "Loading volunteers..."
+                    : "Search and choose your name"
+                }
+                aria-label="Select your name"
+              />
+              <ComboboxContent>
+                <ComboboxEmpty>No matching volunteers found.</ComboboxEmpty>
+                <ComboboxList>
+                  {(volunteer) => (
+                    <ComboboxItem key={volunteer.id} value={volunteer}>
+                      {getVolunteerLabel(volunteer)}
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </ComboboxContent>
+            </Combobox>
+          </div>
 
-        {error ? (
-          <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-            {error}
-          </p>
-        ) : null}
+          {error ? (
+            <Alert variant="destructive" className="text-left">
+              <AlertCircle className="size-4" />
+              <AlertTitle>Unable to continue</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
 
-        {statusMessage ? (
-          <p
-            className={`mt-4 rounded-2xl px-4 py-3 text-sm font-medium ${
-              statusTone === "clock-out"
-                ? "bg-amber-50 text-amber-700"
-                : "bg-emerald-50 text-emerald-700"
-            }`}
-          >
-            {statusMessage}
-          </p>
-        ) : null}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Button
+              type="button"
+              size="lg"
+              onClick={() =>
+                void handleClockAction(
+                  "/api/time-entries/clock-in",
+                  "Clocked in",
+                  true,
+                )
+              }
+              disabled={!canClockIn}
+              className="h-16 w-full min-w-0 rounded-[24px] bg-[#7a1c1c] text-xl font-semibold text-white shadow-[0_14px_28px_rgba(122,28,28,0.16)] hover:bg-[#651616]"
+            >
+              {isSubmitting ? "Saving..." : "Clock In"}
+            </Button>
 
-        <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-          <button
-            type="button"
-            onClick={() =>
-              void handleClockAction(
-                "/api/time-entries/clock-in",
-                "Clocked in",
-                "clock-in",
-              )
-            }
-            disabled={!canClockIn}
-            className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
-          >
-            Clock In
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              void handleClockAction(
-                "/api/time-entries/clock-out",
-                "Clocked out",
-                "clock-out",
-              )
-            }
-            disabled={!canClockOut}
-            className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
-          >
-            Clock Out
-          </button>
-        </div>
-      </div>
+            <Button
+              type="button"
+              size="lg"
+              onClick={() =>
+                void handleClockAction(
+                  "/api/time-entries/clock-out",
+                  "Clocked out",
+                  false,
+                )
+              }
+              disabled={!canClockOut}
+              className="h-16 w-full min-w-0 rounded-[24px] border border-slate-300 bg-white text-xl font-semibold text-slate-950 shadow-sm hover:bg-slate-50"
+            >
+              {isSubmitting ? "Saving..." : "Clock Out"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </main>
   );
 }
