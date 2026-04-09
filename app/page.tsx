@@ -1,80 +1,192 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type ActionState = "idle" | "clocked-in" | "clocked-out";
+
+type ActiveSession = {
+  name: string;
+  clockInTime: string;
+};
+
+const ACTIVE_SESSIONS_KEY = "gcs-active-sessions";
+
 export default function Home() {
-  const time = new Date().toLocaleTimeString();
+  const [time, setTime] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [selectedName, setSelectedName] = useState("");
+  const [actionState, setActionState] = useState<ActionState>("idle");
+  const [actionTime, setActionTime] = useState("");
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+
+  useEffect(() => {
+    setMounted(true);
+    setTime(new Date().toLocaleTimeString());
+
+    const interval = setInterval(() => {
+      setTime(new Date().toLocaleTimeString());
+    }, 1000);
+
+    const storedSessions = window.localStorage.getItem(ACTIVE_SESSIONS_KEY);
+    if (storedSessions) {
+      try {
+        setActiveSessions(JSON.parse(storedSessions) as ActiveSession[]);
+      } catch {
+        window.localStorage.removeItem(ACTIVE_SESSIONS_KEY);
+      }
+    }
+
+    return () => clearInterval(interval);
+  }, []);
+
+  function saveActiveSessions(sessions: ActiveSession[]) {
+    setActiveSessions(sessions);
+    window.localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(sessions));
+  }
+
+  function handleClockIn() {
+    if (!selectedName) return;
+
+    const alreadyClockedIn = activeSessions.some(
+      (session) => session.name === selectedName
+    );
+
+    if (alreadyClockedIn) return;
+
+    const now = new Date().toLocaleTimeString();
+
+    const updatedSessions = [
+      ...activeSessions,
+      {
+        name: selectedName,
+        clockInTime: now,
+      },
+    ];
+
+    saveActiveSessions(updatedSessions);
+    setActionTime(now);
+    setActionState("clocked-in");
+  }
+
+  function handleClockOut() {
+    if (!selectedName) return;
+
+    const matchingSession = activeSessions.find(
+      (session) => session.name === selectedName
+    );
+
+    if (!matchingSession) return;
+
+    const now = new Date().toLocaleTimeString();
+
+    const updatedSessions = activeSessions.filter(
+      (session) => session.name !== selectedName
+    );
+
+    saveActiveSessions(updatedSessions);
+    setActionTime(now);
+    setActionState("clocked-out");
+  }
+
+  function handleReturnHome() {
+    setActionState("idle");
+    setActionTime("");
+    setSelectedName("");
+  }
+
+  const canClockIn =
+    Boolean(selectedName) &&
+    !activeSessions.some((session) => session.name === selectedName);
+
+  const canClockOut =
+    Boolean(selectedName) &&
+    activeSessions.some((session) => session.name === selectedName);
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>Gamecock Community Shop</h1>
-        <h2 style={styles.subtitle}>Volunteer Clock-In</h2>
+    <main className="flex min-h-screen items-start justify-center bg-[#f4f4f4] px-4 pt-20">
+      <div className="w-full max-w-2xl rounded-2xl bg-white p-12 text-center shadow-lg">
+        {actionState === "idle" ? (
+          <>
+            <h1 className="mb-2 text-2xl font-semibold text-[#7a1c1c] sm:text-3xl">
+              Gamecock Community Shop
+            </h1>
 
-        <div style={styles.time}>{time}</div>
+            <h2 className="mb-2 text-lg sm:text-xl">Volunteer Clock-In</h2>
 
-        <hr style={{ margin: "20px 0" }} />
+            <div className="mb-2 min-h-[48px] text-4xl">
+              {mounted ? time : " "}
+            </div>
 
-        <label style={styles.label}>Select Your Name</label>
+            <hr className="my-5" />
 
-        <select style={styles.select}>
-          <option>Select your name</option>
-          <option>John Doe</option>
-          <option>Jane Smith</option>
-        </select>
+            <label className="mb-2 block text-lg">Select Your Name</label>
 
-        <div style={styles.buttonContainer}>
-          <button style={styles.button}>Clock In</button>
-          <button style={styles.button}>Clock Out</button>
-        </div>
+            <select
+              className="mb-6 w-full cursor-pointer rounded-lg border p-3 text-base"
+              value={selectedName}
+              onChange={(e) => setSelectedName(e.target.value)}
+            >
+              <option value="">Select your name</option>
+              <option value="John Doe">John Doe</option>
+              <option value="Jane Smith">Jane Smith</option>
+            </select>
+
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={handleClockIn}
+                disabled={!canClockIn}
+                className={`w-1/2 rounded-lg py-3 text-white transition ${
+                  canClockIn
+                    ? "cursor-pointer bg-[#7a1c1c] hover:bg-[#651616]"
+                    : "cursor-not-allowed bg-[#7a1c1c]/50"
+                }`}
+              >
+                Clock In
+              </button>
+
+              <button
+                type="button"
+                onClick={handleClockOut}
+                disabled={!canClockOut}
+                className={`w-1/2 rounded-lg py-3 text-white transition ${
+                  canClockOut
+                    ? "cursor-pointer bg-[#7a1c1c] hover:bg-[#651616]"
+                    : "cursor-not-allowed bg-[#7a1c1c]/50"
+                }`}
+              >
+                Clock Out
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="py-8">
+            <div className="mb-4 text-4xl">✅</div>
+
+            <h1 className="mb-3 text-2xl font-semibold text-[#7a1c1c] sm:text-3xl">
+              {actionState === "clocked-in"
+                ? "Successfully Clocked In"
+                : "Successfully Clocked Out"}
+            </h1>
+
+            <p className="mb-2 text-lg font-semibold">{selectedName}</p>
+
+            <p className="mb-2 text-base text-neutral-700">
+              {actionState === "clocked-in"
+                ? `Clocked in at ${actionTime}`
+                : `Clocked out at ${actionTime}`}
+            </p>
+
+            <button
+              type="button"
+              onClick={handleReturnHome}
+              className="mt-6 rounded-lg bg-[#7a1c1c] px-6 py-3 text-white transition hover:bg-[#651616]"
+            >
+              Return to Home
+            </button>
+          </div>
+        )}
       </div>
-    </div>
+    </main>
   );
 }
-
-const styles = {
-  page: {
-    height: "100vh",
-    backgroundColor: "#f4f4f4",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  card: {
-    backgroundColor: "white",
-    padding: "30px",
-    borderRadius: "10px",
-    width: "400px",
-    textAlign: "center" as const,
-    boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-  },
-  title: {
-    color: "#7a1c1c",
-    marginBottom: "10px",
-  },
-  subtitle: {
-    marginBottom: "10px",
-  },
-  time: {
-    fontSize: "28px",
-    marginBottom: "10px",
-  },
-  label: {
-    display: "block",
-    marginBottom: "10px",
-  },
-  select: {
-    width: "100%",
-    padding: "10px",
-    marginBottom: "20px",
-  },
-  buttonContainer: {
-    display: "flex",
-    justifyContent: "space-between",
-  },
-  button: {
-    backgroundColor: "#7a1c1c",
-    color: "white",
-    border: "none",
-    padding: "12px",
-    width: "48%",
-    borderRadius: "8px",
-    cursor: "pointer",
-  },
-};
