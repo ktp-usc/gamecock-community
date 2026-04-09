@@ -1,191 +1,320 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-type ActionState = "idle" | "clocked-in" | "clocked-out";
+import type { VolunteerRecord } from "@/lib/api/volunteers";
+import { isOpenTimeEntry, type TimeEntryRecord } from "@/lib/time-entries";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 
-type ActiveSession = {
-  name: string;
-  clockInTime: string;
+type VolunteerResponse = {
+  volunteers?: VolunteerRecord[];
+  error?: string;
 };
 
-const ACTIVE_SESSIONS_KEY = "gcs-active-sessions";
+type ClockResponse = {
+  error?: string;
+};
+
+type TimeEntriesResponse = {
+  timeEntries?: TimeEntryRecord[];
+  error?: string;
+};
+
+type StatusTone = "clock-in" | "clock-out" | "";
+
+function getVolunteerLabel(volunteer: VolunteerRecord) {
+  return `${volunteer.firstName} ${volunteer.lastName}`;
+}
 
 export default function Home() {
   const [time, setTime] = useState("");
-  const [mounted, setMounted] = useState(false);
-  const [selectedName, setSelectedName] = useState("");
-  const [actionState, setActionState] = useState<ActionState>("idle");
-  const [actionTime, setActionTime] = useState("");
-  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
+  const [volunteers, setVolunteers] = useState<VolunteerRecord[]>([]);
+  const [selectedVolunteerId, setSelectedVolunteerId] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingClockStatus, setIsLoadingClockStatus] = useState(false);
+  const [isSelectedVolunteerClockedIn, setIsSelectedVolunteerClockedIn] =
+    useState<boolean | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [statusTone, setStatusTone] = useState<StatusTone>("");
 
   useEffect(() => {
-    setMounted(true);
     setTime(new Date().toLocaleTimeString());
 
-    const interval = setInterval(() => {
+    const interval = window.setInterval(() => {
       setTime(new Date().toLocaleTimeString());
     }, 1000);
 
-    const storedSessions = window.localStorage.getItem(ACTIVE_SESSIONS_KEY);
-    if (storedSessions) {
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    async function loadVolunteers() {
       try {
-        setActiveSessions(JSON.parse(storedSessions) as ActiveSession[]);
-      } catch {
-        window.localStorage.removeItem(ACTIVE_SESSIONS_KEY);
+        setIsLoading(true);
+        setError("");
+
+        const response = await fetch("/api/volunteers");
+        const payload = (await response.json()) as VolunteerResponse;
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to load volunteers.");
+        }
+
+        setVolunteers(payload.volunteers ?? []);
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load volunteers.",
+        );
+      } finally {
+        setIsLoading(false);
       }
     }
 
-    return () => clearInterval(interval);
+    void loadVolunteers();
   }, []);
 
-  function saveActiveSessions(sessions: ActiveSession[]) {
-    setActiveSessions(sessions);
-    window.localStorage.setItem(ACTIVE_SESSIONS_KEY, JSON.stringify(sessions));
-  }
-
-  function handleClockIn() {
-    if (!selectedName) return;
-
-    const alreadyClockedIn = activeSessions.some(
-      (session) => session.name === selectedName
+  const sortedVolunteers = useMemo(() => {
+    return [...volunteers].sort((firstVolunteer, secondVolunteer) =>
+      getVolunteerLabel(firstVolunteer).localeCompare(
+        getVolunteerLabel(secondVolunteer),
+      ),
     );
+  }, [volunteers]);
 
-    if (alreadyClockedIn) return;
+  const selectedVolunteer = useMemo(() => {
+    return volunteers.find((volunteer) => volunteer.id === selectedVolunteerId);
+  }, [selectedVolunteerId, volunteers]);
 
-    const now = new Date().toLocaleTimeString();
+  useEffect(() => {
+    if (!selectedVolunteerId) {
+      setIsSelectedVolunteerClockedIn(null);
+      setIsLoadingClockStatus(false);
+      return;
+    }
 
-    const updatedSessions = [
-      ...activeSessions,
-      {
-        name: selectedName,
-        clockInTime: now,
-      },
-    ];
+    let isCancelled = false;
 
-    saveActiveSessions(updatedSessions);
-    setActionTime(now);
-    setActionState("clocked-in");
-  }
+    async function loadClockStatus() {
+      try {
+        setIsLoadingClockStatus(true);
+        setError("");
 
-  function handleClockOut() {
-    if (!selectedName) return;
+        const response = await fetch(
+          `/api/time-entries?volunteerId=${encodeURIComponent(selectedVolunteerId)}`,
+        );
+        const payload = (await response.json()) as TimeEntriesResponse;
 
-    const matchingSession = activeSessions.find(
-      (session) => session.name === selectedName
-    );
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to load clock status.");
+        }
 
-    if (!matchingSession) return;
+        if (!isCancelled) {
+          setIsSelectedVolunteerClockedIn(
+            (payload.timeEntries ?? []).some(isOpenTimeEntry),
+          );
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load clock status.",
+          );
+          setIsSelectedVolunteerClockedIn(null);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingClockStatus(false);
+        }
+      }
+    }
 
-    const now = new Date().toLocaleTimeString();
+    void loadClockStatus();
 
-    const updatedSessions = activeSessions.filter(
-      (session) => session.name !== selectedName
-    );
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedVolunteerId]);
 
-    saveActiveSessions(updatedSessions);
-    setActionTime(now);
-    setActionState("clocked-out");
-  }
-
-  function handleReturnHome() {
-    setActionState("idle");
-    setActionTime("");
-    setSelectedName("");
-  }
-
+  const hasSelectedVolunteer = Boolean(selectedVolunteerId);
   const canClockIn =
-    Boolean(selectedName) &&
-    !activeSessions.some((session) => session.name === selectedName);
-
+    hasSelectedVolunteer &&
+    isSelectedVolunteerClockedIn === false &&
+    !isLoadingClockStatus &&
+    !isSubmitting;
   const canClockOut =
-    Boolean(selectedName) &&
-    activeSessions.some((session) => session.name === selectedName);
+    hasSelectedVolunteer &&
+    isSelectedVolunteerClockedIn === true &&
+    !isLoadingClockStatus &&
+    !isSubmitting;
+
+  async function handleClockAction(
+    endpoint: "/api/time-entries/clock-in" | "/api/time-entries/clock-out",
+    actionLabel: "Clocked in" | "Clocked out",
+    tone: Exclude<StatusTone, "">,
+  ) {
+    if (!selectedVolunteerId) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setError("");
+      setStatusMessage("");
+      setStatusTone("");
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ volunteerId: selectedVolunteerId }),
+      });
+
+      const payload = (await response.json()) as ClockResponse;
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Unable to save time entry.");
+      }
+
+      const volunteerName = selectedVolunteer
+        ? getVolunteerLabel(selectedVolunteer)
+        : "Volunteer";
+
+      setStatusMessage(`${actionLabel}: ${volunteerName}`);
+      setStatusTone(tone);
+      setIsSelectedVolunteerClockedIn(tone === "clock-in");
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to save time entry.",
+      );
+      setStatusTone("");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
-    <main className="flex min-h-screen items-start justify-center bg-[#f4f4f4] px-4 pt-20">
-      <div className="w-full max-w-2xl rounded-2xl bg-white p-12 text-center shadow-lg">
-        {actionState === "idle" ? (
-          <>
-            <h1 className="mb-2 text-2xl font-semibold text-[#7a1c1c] sm:text-3xl">
-              Gamecock Community Shop
-            </h1>
+    <main className="min-h-screen bg-[#f4f4f4] px-4 py-10 sm:px-6 sm:py-16">
+      <div className="mx-auto w-full max-w-3xl rounded-[32px] border border-[#4a90e2] bg-white p-6 text-center shadow-[0_14px_30px_rgba(0,0,0,0.12)] sm:p-10">
+        <h1 className="text-3xl font-semibold text-[#7a1c1c] sm:text-5xl">
+          Gamecock Community Shop
+        </h1>
 
-            <h2 className="mb-2 text-lg sm:text-xl">Volunteer Clock-In</h2>
+        <h2 className="mt-6 text-2xl font-semibold text-slate-950 sm:text-4xl">
+          Volunteer Clock-In
+        </h2>
 
-            <div className="mb-2 min-h-[48px] text-4xl">
-              {mounted ? time : " "}
-            </div>
+        <div className="mt-6 text-4xl font-light text-slate-950 sm:text-6xl">
+          {time || "--:--:--"}
+        </div>
 
-            <hr className="my-5" />
+        <hr className="my-8 border-slate-200" />
 
-            <label className="mb-2 block text-lg">Select Your Name</label>
+        <div className="text-left">
+          <label
+            htmlFor="volunteer-combobox"
+            className="mb-3 block text-2xl font-semibold text-slate-950"
+          >
+            Select Your Name
+          </label>
 
-            <select
-              className="mb-6 w-full cursor-pointer rounded-lg border p-3 text-base"
-              value={selectedName}
-              onChange={(e) => setSelectedName(e.target.value)}
-            >
-              <option value="">Select your name</option>
-              <option value="John Doe">John Doe</option>
-              <option value="Jane Smith">Jane Smith</option>
-            </select>
+          <Combobox
+            items={sortedVolunteers}
+            value={selectedVolunteer ?? null}
+            onValueChange={(volunteer) =>
+              setSelectedVolunteerId(volunteer?.id ?? "")
+            }
+            itemToStringLabel={getVolunteerLabel}
+            itemToStringValue={(volunteer) => volunteer.id}
+            disabled={isLoading || sortedVolunteers.length === 0}
+            name="volunteer"
+            autoHighlight
+          >
+            <ComboboxInput
+              id="volunteer-combobox"
+              placeholder={
+                isLoading
+                  ? "Loading volunteers..."
+                  : "Search and choose your name"
+              }
+              aria-label="Select your name"
+            />
+            <ComboboxContent>
+              <ComboboxEmpty>No matching volunteers found.</ComboboxEmpty>
+              <ComboboxList>
+                {(volunteer) => (
+                  <ComboboxItem key={volunteer.id} value={volunteer}>
+                    {getVolunteerLabel(volunteer)}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
+        </div>
 
-            <div className="flex gap-4">
-              <button
-                type="button"
-                onClick={handleClockIn}
-                disabled={!canClockIn}
-                className={`w-1/2 rounded-lg py-3 text-white transition ${
-                  canClockIn
-                    ? "cursor-pointer bg-[#7a1c1c] hover:bg-[#651616]"
-                    : "cursor-not-allowed bg-[#7a1c1c]/50"
-                }`}
-              >
-                Clock In
-              </button>
+        {error ? (
+          <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {error}
+          </p>
+        ) : null}
 
-              <button
-                type="button"
-                onClick={handleClockOut}
-                disabled={!canClockOut}
-                className={`w-1/2 rounded-lg py-3 text-white transition ${
-                  canClockOut
-                    ? "cursor-pointer bg-[#7a1c1c] hover:bg-[#651616]"
-                    : "cursor-not-allowed bg-[#7a1c1c]/50"
-                }`}
-              >
-                Clock Out
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="py-8">
-            <div className="mb-4 text-4xl">✅</div>
+        {statusMessage ? (
+          <p
+            className={`mt-4 rounded-2xl px-4 py-3 text-sm font-medium ${
+              statusTone === "clock-out"
+                ? "bg-amber-50 text-amber-700"
+                : "bg-emerald-50 text-emerald-700"
+            }`}
+          >
+            {statusMessage}
+          </p>
+        ) : null}
 
-            <h1 className="mb-3 text-2xl font-semibold text-[#7a1c1c] sm:text-3xl">
-              {actionState === "clocked-in"
-                ? "Successfully Clocked In"
-                : "Successfully Clocked Out"}
-            </h1>
+        <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+          <button
+            type="button"
+            onClick={() =>
+              void handleClockAction(
+                "/api/time-entries/clock-in",
+                "Clocked in",
+                "clock-in",
+              )
+            }
+            disabled={!canClockIn}
+            className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
+          >
+            Clock In
+          </button>
 
-            <p className="mb-2 text-lg font-semibold">{selectedName}</p>
-
-            <p className="mb-2 text-base text-neutral-700">
-              {actionState === "clocked-in"
-                ? `Clocked in at ${actionTime}`
-                : `Clocked out at ${actionTime}`}
-            </p>
-
-            <button
-              type="button"
-              onClick={handleReturnHome}
-              className="mt-6 rounded-lg bg-[#7a1c1c] px-6 py-3 text-white transition hover:bg-[#651616]"
-            >
-              Return to Home
-            </button>
-          </div>
-        )}
+          <button
+            type="button"
+            onClick={() =>
+              void handleClockAction(
+                "/api/time-entries/clock-out",
+                "Clocked out",
+                "clock-out",
+              )
+            }
+            disabled={!canClockOut}
+            className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
+          >
+            Clock Out
+          </button>
+        </div>
       </div>
     </main>
   );
