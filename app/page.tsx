@@ -3,6 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { VolunteerRecord } from "@/lib/api/volunteers";
+import { isOpenTimeEntry, type TimeEntryRecord } from "@/lib/time-entries";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/ui/combobox";
 
 type VolunteerResponse = {
   volunteers?: VolunteerRecord[];
@@ -10,6 +19,11 @@ type VolunteerResponse = {
 };
 
 type ClockResponse = {
+  error?: string;
+};
+
+type TimeEntriesResponse = {
+  timeEntries?: TimeEntryRecord[];
   error?: string;
 };
 
@@ -23,8 +37,10 @@ export default function Home() {
   const [time, setTime] = useState("");
   const [volunteers, setVolunteers] = useState<VolunteerRecord[]>([]);
   const [selectedVolunteerId, setSelectedVolunteerId] = useState("");
-  const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingClockStatus, setIsLoadingClockStatus] = useState(false);
+  const [isSelectedVolunteerClockedIn, setIsSelectedVolunteerClockedIn] =
+    useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
@@ -76,21 +92,72 @@ export default function Home() {
     );
   }, [volunteers]);
 
-  const filteredVolunteers = useMemo(() => {
-    const normalizedSearch = search.trim().toLowerCase();
-
-    if (!normalizedSearch) {
-      return sortedVolunteers;
-    }
-
-    return sortedVolunteers.filter((volunteer) =>
-      getVolunteerLabel(volunteer).toLowerCase().includes(normalizedSearch),
-    );
-  }, [search, sortedVolunteers]);
-
   const selectedVolunteer = useMemo(() => {
     return volunteers.find((volunteer) => volunteer.id === selectedVolunteerId);
   }, [selectedVolunteerId, volunteers]);
+
+  useEffect(() => {
+    if (!selectedVolunteerId) {
+      setIsSelectedVolunteerClockedIn(null);
+      setIsLoadingClockStatus(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    async function loadClockStatus() {
+      try {
+        setIsLoadingClockStatus(true);
+        setError("");
+
+        const response = await fetch(
+          `/api/time-entries?volunteerId=${encodeURIComponent(selectedVolunteerId)}`,
+        );
+        const payload = (await response.json()) as TimeEntriesResponse;
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to load clock status.");
+        }
+
+        if (!isCancelled) {
+          setIsSelectedVolunteerClockedIn(
+            (payload.timeEntries ?? []).some(isOpenTimeEntry),
+          );
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load clock status.",
+          );
+          setIsSelectedVolunteerClockedIn(null);
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingClockStatus(false);
+        }
+      }
+    }
+
+    void loadClockStatus();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [selectedVolunteerId]);
+
+  const hasSelectedVolunteer = Boolean(selectedVolunteerId);
+  const canClockIn =
+    hasSelectedVolunteer &&
+    isSelectedVolunteerClockedIn === false &&
+    !isLoadingClockStatus &&
+    !isSubmitting;
+  const canClockOut =
+    hasSelectedVolunteer &&
+    isSelectedVolunteerClockedIn === true &&
+    !isLoadingClockStatus &&
+    !isSubmitting;
 
   async function handleClockAction(
     endpoint: "/api/time-entries/clock-in" | "/api/time-entries/clock-out",
@@ -127,6 +194,7 @@ export default function Home() {
 
       setStatusMessage(`${actionLabel}: ${volunteerName}`);
       setStatusTone(tone);
+      setIsSelectedVolunteerClockedIn(tone === "clock-in");
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -158,40 +226,44 @@ export default function Home() {
 
         <div className="text-left">
           <label
-            htmlFor="volunteer-search"
+            htmlFor="volunteer-combobox"
             className="mb-3 block text-2xl font-semibold text-slate-950"
           >
             Select Your Name
           </label>
 
-          <input
-            id="volunteer-search"
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by first or last name"
-            className="mb-4 w-full rounded-2xl border border-slate-300 px-4 py-3 text-lg outline-none transition focus:border-[#4a90e2] focus:ring-4 focus:ring-[#4a90e2]/15"
-          />
-
-          <select
-            value={selectedVolunteerId}
-            onChange={(event) => setSelectedVolunteerId(event.target.value)}
-            disabled={isLoading || filteredVolunteers.length === 0}
-            className="cursor-pointer w-full rounded-2xl border border-slate-300 bg-white px-4 py-4 text-lg outline-none transition focus:border-[#4a90e2] focus:ring-4 focus:ring-[#4a90e2]/15 disabled:cursor-not-allowed disabled:bg-slate-100"
+          <Combobox
+            items={sortedVolunteers}
+            value={selectedVolunteer ?? null}
+            onValueChange={(volunteer) =>
+              setSelectedVolunteerId(volunteer?.id ?? "")
+            }
+            itemToStringLabel={getVolunteerLabel}
+            itemToStringValue={(volunteer) => volunteer.id}
+            disabled={isLoading || sortedVolunteers.length === 0}
+            name="volunteer"
+            autoHighlight
           >
-            <option value="">
-              {isLoading
-                ? "Loading volunteers..."
-                : filteredVolunteers.length === 0
-                  ? "No matching volunteers found"
-                  : "Choose your name"}
-            </option>
-            {filteredVolunteers.map((volunteer) => (
-              <option key={volunteer.id} value={volunteer.id}>
-                {getVolunteerLabel(volunteer)}
-              </option>
-            ))}
-          </select>
+            <ComboboxInput
+              id="volunteer-combobox"
+              placeholder={
+                isLoading
+                  ? "Loading volunteers..."
+                  : "Search and choose your name"
+              }
+              aria-label="Select your name"
+            />
+            <ComboboxContent>
+              <ComboboxEmpty>No matching volunteers found.</ComboboxEmpty>
+              <ComboboxList>
+                {(volunteer) => (
+                  <ComboboxItem key={volunteer.id} value={volunteer}>
+                    {getVolunteerLabel(volunteer)}
+                  </ComboboxItem>
+                )}
+              </ComboboxList>
+            </ComboboxContent>
+          </Combobox>
         </div>
 
         {error ? (
@@ -222,7 +294,7 @@ export default function Home() {
                 "clock-in",
               )
             }
-            disabled={!selectedVolunteerId || isSubmitting}
+            disabled={!canClockIn}
             className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
           >
             Clock In
@@ -237,7 +309,7 @@ export default function Home() {
                 "clock-out",
               )
             }
-            disabled={!selectedVolunteerId || isSubmitting}
+            disabled={!canClockOut}
             className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
           >
             Clock Out
