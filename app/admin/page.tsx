@@ -4,9 +4,62 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ADMIN_AUTH_KEY,
   ADMIN_PASSWORD,
-  loadEntries,
-  type VolunteerLogEntry,
 } from "@/lib/volunteer-log";
+import type { VolunteerRecord } from "@/lib/api/volunteers";
+import type { TimeEntryRecord } from "@/lib/time-entries";
+
+type VolunteerLogEntry = {
+  id: string;
+  name: string;
+  dateLabel: string;
+  clockInLabel: string;
+  clockOutLabel: string;
+  totalHours: string;
+};
+
+type VolunteersResponse = {
+  volunteers?: VolunteerRecord[];
+  error?: string;
+};
+
+type TimeEntriesResponse = {
+  timeEntries?: TimeEntryRecord[];
+  error?: string;
+};
+// correctly format the date
+function formatDateLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit",
+  }).format(date);
+}
+// correctly format the time
+function formatTimeLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+// format the total hours
+function formatHours(startISO: string, endISO: string) {
+  const start = new Date(startISO).getTime();
+  const end = new Date(endISO).getTime();
+  const totalMinutes = Math.max(0, Math.round((end - start) / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) { // less than an hour, only show minutes
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) { // 0 minutes, only show hour
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`; // otherwise show hours and minutes
+}
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -15,8 +68,71 @@ export default function AdminPage() {
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
-  function refreshEntries() {
-    setEntries(loadEntries().slice().reverse());
+  async function refreshEntries() {
+    try {
+      setError("");
+
+      const [volunteersResponse, timeEntriesResponse] = await Promise.all([
+        fetch("/api/volunteers"),
+        fetch("/api/time-entries"),
+      ]);
+
+      const volunteersPayload =
+        (await volunteersResponse.json()) as VolunteersResponse;
+      const timeEntriesPayload =
+        (await timeEntriesResponse.json()) as TimeEntriesResponse;
+
+      if (!volunteersResponse.ok) {
+        throw new Error(
+          volunteersPayload.error ?? "Unable to load volunteers.",
+        );
+      }
+
+      if (!timeEntriesResponse.ok) {
+        throw new Error(
+          timeEntriesPayload.error ?? "Unable to load time entries.",
+        );
+      }
+
+      const volunteerMap = new Map(
+        (volunteersPayload.volunteers ?? []).map((volunteer) => [
+          volunteer.id,
+          `${volunteer.firstName} ${volunteer.lastName}`,
+        ]),
+      );
+
+      const nextEntries = (timeEntriesPayload.timeEntries ?? [])
+        .slice()
+        .sort(
+          (firstEntry, secondEntry) =>
+            new Date(secondEntry.clockIn).getTime() -
+            new Date(firstEntry.clockIn).getTime(),
+        )
+        .map((entry) => {
+          const clockInDate = new Date(entry.clockIn);
+          const clockOutDate = entry.clockOut ? new Date(entry.clockOut) : null;
+
+          return {
+            id: entry.id,
+            name: volunteerMap.get(entry.volunteerId) ?? "Unknown volunteer",
+            dateLabel: formatDateLabel(clockInDate),
+            clockInLabel: formatTimeLabel(clockInDate),
+            clockOutLabel: clockOutDate ? formatTimeLabel(clockOutDate) : "",
+            totalHours: clockOutDate
+              ? formatHours(entry.clockIn, entry.clockOut!)
+              : "",
+          };
+        });
+
+      setEntries(nextEntries);
+    } catch (loadError) {
+      setEntries([]);
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load volunteer log.",
+      );
+    }
   }
 
   useEffect(() => {
@@ -25,7 +141,9 @@ export default function AdminPage() {
       window.localStorage.getItem(ADMIN_AUTH_KEY) === "true";
 
     setAuthenticated(isAuthed);
-    if (isAuthed) refreshEntries();
+    if (isAuthed) {
+      void refreshEntries();
+    }
   }, []);
 
   function handleLogin() {
@@ -37,7 +155,7 @@ export default function AdminPage() {
     window.localStorage.setItem(ADMIN_AUTH_KEY, "true");
     setAuthenticated(true);
     setError("");
-    refreshEntries();
+    void refreshEntries();
   }
 
   function handleLogout() {
@@ -112,7 +230,7 @@ export default function AdminPage() {
 
             <div className="flex gap-3">
               <button
-                onClick={refreshEntries}
+                onClick={() => void refreshEntries()}
                 className="rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700"
               >
                 Refresh
