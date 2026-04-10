@@ -16,10 +16,11 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [newVolunteerName, setNewVolunteerName] = useState("");
-  const currentMonthYear = new Date().toLocaleString("en-US", {
+  const currentDate = new Intl.DateTimeFormat("en-US", {
     month: "long",
+    day: "numeric",
     year: "numeric",
-  });
+  }).format(new Date())
   
 
   function refreshEntries() {
@@ -141,7 +142,7 @@ export default function AdminPage() {
             <h1 className="text-4xl font-bold tracking-tight text-[#a61c1c] sm:text-5xl">
               Volunteer Time Log
             </h1>
-            <p className="text-xl text-neutral-700">{currentMonthYear}</p>
+            <p className="text-3xl text-neutral-700">{currentDate}</p>
           </div>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
