@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
-import "./globals.css";
 import React from "react";
-import Navbar from "@/components/navbar";
+
 import Footer from "@/components/footer";
+import Navbar from "@/components/navbar";
 import { Toaster } from "@/components/ui/sonner";
+
+import "./globals.css";
 
 const manrope = Manrope({
   subsets: ["latin"],
@@ -13,7 +15,8 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "Gamecock Community Shop Volunteer Portal",
-  description: "Volunteer check-in, training, and time tracking for the Gamecock Community Shop.",
+  description:
+    "Volunteer check-in, training, and time tracking for the Gamecock Community Shop.",
 };
 
 export default function RootLayout({
@@ -25,9 +28,7 @@ export default function RootLayout({
         className={`${manrope.variable} flex min-h-screen flex-col overflow-x-hidden bg-[#f4f4f4] font-[family:var(--font-manrope)] text-slate-950 antialiased`}
       >
         <Navbar />
-        <div className="flex-1">
-          {children}
-        </div>
+        <div className="flex-1">{children}</div>
         <Footer />
         <Toaster position="top-center" richColors />
       </body>

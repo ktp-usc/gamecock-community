@@ -39,11 +39,66 @@ type TimeEntriesResponse = {
   error?: string;
 };
 
+const PAGE_PASSWORD = "gamecock2026";
+const AUTH_KEY = "home-page-auth";
+
 function getVolunteerLabel(volunteer: VolunteerRecord) {
   return `${volunteer.firstName} ${volunteer.lastName}`;
 }
 
-export default function Home() {
+function PasswordScreen({
+  password,
+  setPassword,
+  error,
+  onSubmit,
+}: {
+  password: string;
+  setPassword: (value: string) => void;
+  error: string;
+  onSubmit: () => void;
+}) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-black px-4">
+      <div className="w-full max-w-[760px] rounded-[32px] bg-white px-10 py-12 shadow-2xl sm:px-12 sm:py-14">
+        <h1 className="text-center text-4xl font-bold text-[#a61c1c] sm:text-5xl">
+          Access Required
+        </h1>
+        <p className="mt-5 text-center text-lg text-neutral-600 sm:text-xl">
+          Enter the password to access this page.
+        </p>
+
+        <input
+          type="password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              onSubmit();
+            }
+          }}
+          placeholder="Password"
+          className="mt-10 h-14 w-full rounded-2xl border border-neutral-300 px-5 text-lg outline-none transition focus:border-[#a61c1c] focus:ring-4 focus:ring-[#a61c1c]/10 sm:h-16 sm:text-xl"
+        />
+
+        {error ? (
+          <p className="mt-4 text-sm font-medium text-[#a61c1c] sm:text-base">
+            {error}
+          </p>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={onSubmit}
+          className="mt-8 h-14 w-full rounded-2xl bg-[#a61c1c] text-xl font-semibold text-white transition hover:bg-[#8f1616] sm:h-16 sm:text-2xl"
+        >
+          Enter
+        </button>
+      </div>
+    </main>
+  );
+}
+
+function HomeContent({ onLogout }: { onLogout: () => void }) {
   const [time, setTime] = useState("");
   const [volunteers, setVolunteers] = useState<VolunteerRecord[]>([]);
   const [selectedVolunteerId, setSelectedVolunteerId] = useState("");
@@ -212,6 +267,17 @@ export default function Home() {
 
   return (
     <main className="bg-[#f4f4f4] px-4 py-10 sm:px-6 sm:py-14">
+      <div className="mx-auto mb-4 flex w-full max-w-3xl justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onLogout}
+          className="rounded-2xl px-5"
+        >
+          Logout
+        </Button>
+      </div>
+
       <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-[28px] border-slate-200 bg-white text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
         <CardHeader className="items-center gap-2 px-6 pt-7 sm:px-10 sm:pt-8">
           <CardTitle className="text-3xl text-[#7a1c1c] sm:text-4xl">
@@ -328,4 +394,49 @@ export default function Home() {
       </Card>
     </main>
   );
+}
+
+export default function Home() {
+  const [authenticated, setAuthenticated] = useState(false);
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const savedAuth = window.localStorage.getItem(AUTH_KEY);
+    if (savedAuth === "true") {
+      setAuthenticated(true);
+    }
+  }, []);
+
+  function handleLogin() {
+    if (password !== PAGE_PASSWORD) {
+      setError("Incorrect password.");
+      return;
+    }
+
+    window.localStorage.setItem(AUTH_KEY, "true");
+    setAuthenticated(true);
+    setError("");
+    setPassword("");
+  }
+
+  function handleLogout() {
+    window.localStorage.removeItem(AUTH_KEY);
+    setAuthenticated(false);
+    setPassword("");
+    setError("");
+  }
+
+  if (!authenticated) {
+    return (
+      <PasswordScreen
+        password={password}
+        setPassword={setPassword}
+        error={error}
+        onSubmit={handleLogin}
+      />
+    );
+  }
+
+  return <HomeContent onLogout={handleLogout} />;
 }

@@ -6,7 +6,8 @@ export default function Footer() {
       <div className="mx-auto flex max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="space-y-1 text-center md:text-left">
           <p className="font-semibold text-slate-900">Gamecock Community Shop</p>
-          <p>701 Assembly St, Columbia, SC 29210</p>
+          <p>Carolina Coliseum, Suite 4000</p>
+          <p>701 Assembly Street, Columbia, SC 29201</p>
           <p>Volunteer check-in and time tracking portal.</p>
         </div>
 

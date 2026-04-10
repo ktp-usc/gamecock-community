@@ -10,11 +10,10 @@ export type VolunteerLogEntry = {
     totalHours: string;
   };
   
-  export const LOG_STORAGE_KEY = "gamecock-volunteer-log";
-  export const ADMIN_AUTH_KEY = "gamecock-admin-auth";
-  export const ADMIN_PASSWORD = "gamecock2026";
-  
-  export const VOLUNTEER_NAMES = [
+export const LOG_STORAGE_KEY = "gamecock-volunteer-log";
+export const ADMIN_AUTH_KEY = "gamecock-admin-auth";
+
+export const VOLUNTEER_NAMES = [
     "John Doe",
     "Jane Smith",
     "Micheal Brown",
