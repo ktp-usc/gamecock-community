@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  ADMIN_AUTH_KEY,
-  ADMIN_PASSWORD,
-  loadEntries,
-  type VolunteerLogEntry,
-} from "@/lib/volunteer-log";
+import { useMemo, useState } from "react";
+
+import { loadEntries, type VolunteerLogEntry } from "@/lib/volunteer-log";
+
+type AuthResponse = {
+  ok?: boolean;
+  error?: string;
+};
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -14,44 +15,70 @@ export default function AdminPage() {
   const [entries, setEntries] = useState<VolunteerLogEntry[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newVolunteerName, setNewVolunteerName] = useState("");
   const currentMonthYear = new Date().toLocaleString("en-US", {
     month: "long",
     year: "numeric",
   });
-  
 
   function refreshEntries() {
     setEntries(loadEntries().slice().reverse());
   }
 
-  useEffect(() => {
-    const isAuthed =
-      typeof window !== "undefined" &&
-      window.localStorage.getItem(ADMIN_AUTH_KEY) === "true";
+  async function handleLogin() {
+    try {
+      setIsSubmitting(true);
+      setError("");
 
-    setAuthenticated(isAuthed);
-    if (isAuthed) refreshEntries();
-  }, []);
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+      const payload = (await response.json()) as AuthResponse;
 
-  function handleLogin() {
-    if (password !== ADMIN_PASSWORD) {
-      setError("Incorrect password.");
-      return;
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to sign in.");
+        return;
+      }
+
+      setAuthenticated(true);
+      setPassword("");
+      refreshEntries();
+    } catch {
+      setError("Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    window.localStorage.setItem(ADMIN_AUTH_KEY, "true");
-    setAuthenticated(true);
-    setError("");
-    refreshEntries();
   }
 
-  function handleLogout() {
-    window.localStorage.removeItem(ADMIN_AUTH_KEY);
-    setAuthenticated(false);
-    setPassword("");
-    setSearch("");
+  async function handleLogout() {
+    try {
+      setIsSubmitting(true);
+      setError("");
+
+      const response = await fetch("/api/admin/logout", {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        setError("Unable to log out.");
+        return;
+      }
+
+      setAuthenticated(false);
+      setEntries([]);
+      setPassword("");
+      setSearch("");
+    } catch {
+      setError("Unable to log out.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const filteredEntries = useMemo(() => {
@@ -87,10 +114,11 @@ export default function AdminPage() {
             ) : null}
 
             <button
-              onClick={handleLogin}
-              className="mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616]"
+              onClick={() => void handleLogin()}
+              disabled={isSubmitting}
+              className="mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616] disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60"
             >
-              Enter
+              {isSubmitting ? "Checking..." : "Enter"}
             </button>
           </section>
         </div>
@@ -134,8 +162,9 @@ export default function AdminPage() {
                 Refresh
               </button>
               <button
-                onClick={handleLogout}
-                className="rounded-2xl bg-[#a61c1c] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#8f1616]"
+                onClick={() => void handleLogout()}
+                disabled={isSubmitting}
+                className="rounded-2xl bg-[#a61c1c] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#8f1616] disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60"
               >
                 Logout
               </button>
