@@ -16,10 +16,11 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [newVolunteerName, setNewVolunteerName] = useState("");
-  const currentMonthYear = new Date().toLocaleString("en-US", {
+  const currentDate = new Intl.DateTimeFormat("en-US", {
     month: "long",
+    day: "numeric",
     year: "numeric",
-  });
+  }).format(new Date())
   
 
   function refreshEntries() {
@@ -52,6 +53,41 @@ export default function AdminPage() {
     setAuthenticated(false);
     setPassword("");
     setSearch("");
+  }
+
+  async function handleAddVolunteer() {
+    const fullName = newVolunteerName.trim();
+  
+    if (!fullName) return;
+  
+    const parts = fullName.split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(" ");
+  
+    if (!lastName) {
+      setError("Please enter a first and last name.");
+      return;
+    }
+  
+    const res = await fetch("/api/volunteers", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+      }),
+    });
+  
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Failed to add volunteer.");
+      return;
+    }
+  
+    setNewVolunteerName("");
+    setShowModal(false);
   }
 
   const filteredEntries = useMemo(() => {
@@ -106,7 +142,7 @@ export default function AdminPage() {
             <h1 className="text-4xl font-bold tracking-tight text-[#a61c1c] sm:text-5xl">
               Volunteer Time Log
             </h1>
-            <p className="text-xl text-neutral-700">{currentMonthYear}</p>
+            <p className="text-3xl text-neutral-700">{currentDate}</p>
           </div>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -203,11 +239,7 @@ export default function AdminPage() {
         </button>
 
         <button
-          onClick={() => {
-            console.log("New volunteer:", newVolunteerName);
-            setShowModal(false);
-            setNewVolunteerName("");
-          }}
+          onClick={handleAddVolunteer}
           className="rounded-xl bg-[#a61c1c] px-4 py-2 text-white"
         >
           Add
