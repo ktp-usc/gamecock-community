@@ -1,17 +1,12 @@
-import { cookies } from "next/headers";
-
 import AdminPageClient from "@/app/admin/admin-page-client";
-import {
-  ADMIN_SESSION_COOKIE,
-  isValidAdminSession,
-} from "@/lib/server/admin-auth";
+import { authServer } from "@/lib/auth/server";
 
 export default async function AdminPage() {
-  const cookieStore = await cookies();
-  const initialAuthenticated = isValidAdminSession(
-    cookieStore.get(ADMIN_SESSION_COOKIE)?.value,
-  );
   const adminEmail = process.env.ADMIN_EMAIL ?? "";
+  const { data: session } = await authServer.getSession();
+  const initialAuthenticated =
+    !!adminEmail &&
+    session?.user?.email?.toLowerCase() === adminEmail.toLowerCase();
 
   return (
     <AdminPageClient
