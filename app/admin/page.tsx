@@ -3,10 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ADMIN_AUTH_KEY,
-  ADMIN_PASSWORD,
   loadEntries,
   type VolunteerLogEntry,
 } from "@/lib/volunteer-log";
+
+type LoginResponse = {
+  ok?: boolean;
+  error?: string;
+};
 
 export default function AdminPage() {
   const [password, setPassword] = useState("");
@@ -14,6 +18,7 @@ export default function AdminPage() {
   const [entries, setEntries] = useState<VolunteerLogEntry[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [newVolunteerName, setNewVolunteerName] = useState("");
   const currentDate = new Intl.DateTimeFormat("en-US", {
@@ -36,16 +41,35 @@ export default function AdminPage() {
     if (isAuthed) refreshEntries();
   }, []);
 
-  function handleLogin() {
-    if (password !== ADMIN_PASSWORD) {
-      setError("Incorrect password.");
-      return;
-    }
+  async function handleLogin() {
+    try {
+      setIsSubmitting(true);
+      setError("");
 
-    window.localStorage.setItem(ADMIN_AUTH_KEY, "true");
-    setAuthenticated(true);
-    setError("");
-    refreshEntries();
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const payload = (await response.json()) as LoginResponse;
+
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to sign in.");
+        return;
+      }
+
+      window.localStorage.setItem(ADMIN_AUTH_KEY, "true");
+      setAuthenticated(true);
+      setError("");
+      refreshEntries();
+    } catch {
+      setError("Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleLogout() {
@@ -123,10 +147,11 @@ export default function AdminPage() {
             ) : null}
 
             <button
-              onClick={handleLogin}
-              className="mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616]"
+              onClick={() => void handleLogin()}
+              disabled={isSubmitting}
+              className="mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616] disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60"
             >
-              Enter
+              {isSubmitting ? "Checking..." : "Enter"}
             </button>
           </section>
         </div>
