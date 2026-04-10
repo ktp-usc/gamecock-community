@@ -73,6 +73,28 @@ function recordFailedAttempt(clientKey: string, now: number) {
   return nextAttempt;
 }
 
+function createRateLimitResponse(blockedUntil: number, now: number) {
+  const retryAfterSeconds = Math.max(
+    1,
+    Math.ceil((blockedUntil - now) / 1000),
+  );
+  const retryAfterMinutes = Math.ceil(retryAfterSeconds / 60);
+
+  return Response.json(
+    {
+      error: `Too many login attempts. Please try again in ${retryAfterMinutes} minute${
+        retryAfterMinutes === 1 ? "" : "s"
+      }.`,
+    },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": retryAfterSeconds.toString(),
+      },
+    },
+  );
+}
+
 export async function POST(request: Request) {
   const input = await readJson<AdminLoginInput>(request);
 
@@ -91,14 +113,14 @@ export async function POST(request: Request) {
   const currentAttempt = getActiveAttempt(clientKey, now);
 
   if (currentAttempt?.blockedUntil && currentAttempt.blockedUntil > now) {
-    return jsonError("Too many login attempts. Please try again later.", 429);
+    return createRateLimitResponse(currentAttempt.blockedUntil, now);
   }
 
   if (input.password !== adminPassword) {
     const nextAttempt = recordFailedAttempt(clientKey, now);
 
     if (nextAttempt.blockedUntil) {
-      return jsonError("Too many login attempts. Please try again later.", 429);
+      return createRateLimitResponse(nextAttempt.blockedUntil, now);
     }
 
     return jsonError("Incorrect password.", 401);
