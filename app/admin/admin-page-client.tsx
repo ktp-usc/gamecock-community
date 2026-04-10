@@ -2,18 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { authClient } from "@/lib/auth/client";
 import { loadEntries, type VolunteerLogEntry } from "@/lib/volunteer-log";
 
-type AuthResponse = {
-  ok?: boolean;
-  error?: string;
-};
-
 type AdminPageClientProps = {
+  adminEmail: string;
   initialAuthenticated: boolean;
 };
 
 export default function AdminPageClient({
+  adminEmail,
   initialAuthenticated,
 }: AdminPageClientProps) {
   const [password, setPassword] = useState("");
@@ -47,17 +45,18 @@ export default function AdminPageClient({
       setIsSubmitting(true);
       setError("");
 
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ password }),
-      });
-      const payload = (await response.json()) as AuthResponse;
+      if (!adminEmail) {
+        setError("Admin email is not configured.");
+        return;
+      }
 
-      if (!response.ok) {
-        setError(payload.error ?? "Unable to sign in.");
+      const result = await authClient.signIn.email({
+        email: adminEmail,
+        password,
+      });
+
+      if (result.error) {
+        setError(result.error.message ?? "Unable to sign in.");
         return;
       }
 
@@ -76,12 +75,10 @@ export default function AdminPageClient({
       setIsSubmitting(true);
       setError("");
 
-      const response = await fetch("/api/admin/logout", {
-        method: "POST",
-      });
+      const result = await authClient.signOut();
 
-      if (!response.ok) {
-        setError("Unable to log out.");
+      if (result.error) {
+        setError(result.error.message ?? "Unable to log out.");
         return;
       }
 

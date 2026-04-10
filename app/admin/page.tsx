@@ -11,6 +11,12 @@ export default async function AdminPage() {
   const initialAuthenticated = isValidAdminSession(
     cookieStore.get(ADMIN_SESSION_COOKIE)?.value,
   );
+  const adminEmail = process.env.ADMIN_EMAIL ?? "";
 
-  return <AdminPageClient initialAuthenticated={initialAuthenticated} />;
+  return (
+    <AdminPageClient
+      adminEmail={adminEmail}
+      initialAuthenticated={initialAuthenticated}
+    />
+  );
 }
