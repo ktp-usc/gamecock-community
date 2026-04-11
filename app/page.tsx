@@ -23,6 +23,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 
 type VolunteerResponse = {
@@ -58,42 +59,59 @@ function PasswordScreen({
   onSubmit: () => void;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-4">
-      <div className="w-full max-w-[760px] rounded-[32px] bg-white px-10 py-12 shadow-2xl sm:px-12 sm:py-14">
-        <h1 className="text-center text-4xl font-bold text-[#a61c1c] sm:text-5xl">
-          Access Required
-        </h1>
-        <p className="mt-5 text-center text-lg text-neutral-600 sm:text-xl">
-          Enter the password to access this page.
-        </p>
+    <main className="bg-[#f4f4f4] px-4 pb-10 pt-8 sm:px-6 sm:pb-14 sm:pt-10">
+      <Card className="mx-auto w-full max-w-xl rounded-[28px] border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+        <CardHeader className="items-center gap-2 px-6 pt-7 text-center sm:px-10 sm:pt-8">
+          <CardTitle className="text-3xl text-[#7a1c1c] sm:text-4xl">
+            Volunteer Access
+          </CardTitle>
+          <CardDescription className="mx-auto max-w-md text-base leading-7 text-slate-600">
+            Enter the portal password to open the volunteer clock-in page.
+          </CardDescription>
+        </CardHeader>
 
-        <input
-          type="password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
+        <CardContent className="px-6 pb-7 pt-1 sm:px-10 sm:pb-8 sm:pt-2">
+            <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
               onSubmit();
-            }
-          }}
-          placeholder="Password"
-          className="mt-10 h-14 w-full rounded-2xl border border-neutral-300 px-5 text-lg outline-none transition focus:border-[#a61c1c] focus:ring-4 focus:ring-[#a61c1c]/10 sm:h-16 sm:text-xl"
-        />
+            }}
+          >
+            <div className="space-y-2 text-left">
+                <label
+                  htmlFor="home-password"
+                  className="text-sm font-semibold text-slate-900"
+                >
+                  Password
+              </label>
+              <Input
+                id="home-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter password"
+                className="h-12 rounded-2xl border-slate-300 bg-white px-4 text-base shadow-none focus-visible:border-[#7a1c1c] focus-visible:ring-[#7a1c1c]/15"
+              />
+            </div>
 
-        {error ? (
-          <p className="mt-4 text-sm font-medium text-[#a61c1c] sm:text-base">
-            {error}
-          </p>
-        ) : null}
+            {error ? (
+              <Alert variant="destructive" className="border-red-200 text-left">
+                <AlertCircle className="size-4" />
+                <AlertTitle>Unable to continue</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
 
-        <button
-          type="button"
-          onClick={onSubmit}
-          className="mt-8 h-14 w-full rounded-2xl bg-[#a61c1c] text-xl font-semibold text-white transition hover:bg-[#8f1616] sm:h-16 sm:text-2xl"
-        >
-          Enter
-        </button>
-      </div>
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-2xl bg-[#7a1c1c] text-base font-semibold text-white hover:bg-[#651616]"
+            >
+              Enter
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }
@@ -129,7 +147,8 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
         const payload = (await response.json()) as VolunteerResponse;
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to load volunteers.");
+          setError(payload.error ?? "Unable to load volunteers.");
+          return;
         }
 
         setVolunteers(payload.volunteers ?? []);
@@ -179,7 +198,11 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
         const payload = (await response.json()) as TimeEntriesResponse;
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to load clock status.");
+          if (!isCancelled) {
+            setError(payload.error ?? "Unable to load clock status.");
+            setIsSelectedVolunteerClockedIn(null);
+          }
+          return;
         }
 
         if (!isCancelled) {
@@ -245,7 +268,8 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
       const payload = (await response.json()) as ClockResponse;
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to save time entry.");
+        toast.error(payload.error ?? "Unable to save time entry.");
+        return;
       }
 
       const volunteerName = selectedVolunteer
@@ -266,20 +290,20 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
   }
 
   return (
-    <main className="bg-[#f4f4f4] px-4 py-10 sm:px-6 sm:py-14">
+    <main className="bg-[#f4f4f4] px-4 pb-10 pt-8 sm:px-6 sm:pb-14 sm:pt-10">
       <div className="mx-auto mb-4 flex w-full max-w-3xl justify-end">
         <Button
           type="button"
           variant="secondary"
           onClick={onLogout}
-          className="rounded-2xl px-5"
+          className="rounded-2xl border border-slate-200 bg-white px-5 text-slate-700 shadow-sm hover:bg-slate-50"
         >
           Logout
         </Button>
       </div>
 
       <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-[28px] border-slate-200 bg-white text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
-        <CardHeader className="items-center gap-2 px-6 pt-7 sm:px-10 sm:pt-8">
+        <CardHeader className="items-center gap-2 px-6 pt-6 sm:px-10 sm:pt-7">
           <CardTitle className="text-3xl text-[#7a1c1c] sm:text-4xl">
             Gamecock Community Shop
           </CardTitle>
@@ -291,8 +315,8 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-6 px-6 py-6 sm:px-10 sm:py-8">
-          <div className="rounded-[24px] border border-slate-200 bg-white px-5 py-4 text-center shadow-sm">
+        <CardContent className="space-y-6 px-6 py-5 sm:px-10 sm:py-7">
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-center shadow-sm">
             <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 sm:text-sm">
               <Clock3 className="size-4 text-[#7a1c1c]" />
               Current Time
@@ -397,16 +421,15 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
 }
 
 export default function Home() {
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.localStorage.getItem(AUTH_KEY) === "true";
+  });
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const savedAuth = window.localStorage.getItem(AUTH_KEY);
-    if (savedAuth === "true") {
-      setAuthenticated(true);
-    }
-  }, []);
 
   function handleLogin() {
     if (password !== PAGE_PASSWORD) {

@@ -117,13 +117,13 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
+  }
   html {
     scroll-behavior: smooth;
-    }
+  }
   body {
     @apply bg-background text-foreground;
-    }
+  }
   ::selection {
     background: rgba(122, 28, 28, 0.14);
     color: #1f2937;
@@ -143,18 +143,4 @@
   [aria-disabled="true"] {
     cursor: not-allowed;
   }
-}
-
-.clock-card {
-  border-radius: 24px;
-  background: #ffffff;
-  padding: 2.5rem 2rem;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
-}
-
-.admin-card {
-  border-radius: 24px;
-  background: #ffffff;
-  padding: 2.5rem 2rem;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }

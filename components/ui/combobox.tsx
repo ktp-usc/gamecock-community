@@ -18,7 +18,7 @@ function ComboboxInput({
       <ComboboxPrimitive.Input
         data-slot="combobox-input"
         className={cn(
-          "flex h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pr-20 text-lg text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-[#4a90e2] focus:ring-4 focus:ring-[#4a90e2]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500",
+          "flex h-14 w-full rounded-2xl border border-slate-300 bg-white px-4 pr-20 text-lg text-slate-950 outline-none transition placeholder:text-slate-500 focus:border-[#7a1c1c] focus:ring-4 focus:ring-[#7a1c1c]/15 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500",
           className,
         )}
         {...props}
@@ -112,7 +112,7 @@ function ComboboxItem({
       {...props}
     >
       <ComboboxPrimitive.ItemIndicator data-slot="combobox-item-indicator">
-        <Check className="size-4 text-[#4a90e2]" />
+        <Check className="size-4 text-[#7a1c1c]" />
       </ComboboxPrimitive.ItemIndicator>
       <span className="truncate">{children}</span>
     </ComboboxPrimitive.Item>
