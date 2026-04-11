@@ -3,9 +3,62 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ADMIN_AUTH_KEY,
-  loadEntries,
-  type VolunteerLogEntry,
 } from "@/lib/volunteer-log";
+import type { VolunteerRecord } from "@/lib/api/volunteers";
+import type { TimeEntryRecord } from "@/lib/time-entries";
+
+type VolunteerLogEntry = {
+  id: string;
+  name: string;
+  dateLabel: string;
+  clockInLabel: string;
+  clockOutLabel: string;
+  totalHours: string;
+};
+
+type VolunteersResponse = {
+  volunteers?: VolunteerRecord[];
+  error?: string;
+};
+
+type TimeEntriesResponse = {
+  timeEntries?: TimeEntryRecord[];
+  error?: string;
+};
+// correctly format the date
+function formatDateLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit",
+  }).format(date);
+}
+// correctly format the time
+function formatTimeLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+// format the total hours
+function formatHours(startISO: string, endISO: string) {
+  const start = new Date(startISO).getTime();
+  const end = new Date(endISO).getTime();
+  const totalMinutes = Math.max(0, Math.round((end - start) / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) { // less than an hour, only show minutes
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) { // 0 minutes, only show hour
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`; // otherwise show hours and minutes
+}
 
 type LoginResponse = {
   ok?: boolean;
@@ -26,10 +79,73 @@ export default function AdminPage() {
     day: "numeric",
     year: "numeric",
   }).format(new Date())
-  
 
-  function refreshEntries() {
-    setEntries(loadEntries().slice().reverse());
+
+  async function refreshEntries() {
+    try {
+      setError("");
+
+      const [volunteersResponse, timeEntriesResponse] = await Promise.all([
+        fetch("/api/volunteers"),
+        fetch("/api/time-entries"),
+      ]);
+
+      const volunteersPayload =
+        (await volunteersResponse.json()) as VolunteersResponse;
+      const timeEntriesPayload =
+        (await timeEntriesResponse.json()) as TimeEntriesResponse;
+
+      if (!volunteersResponse.ok) {
+        throw new Error(
+          volunteersPayload.error ?? "Unable to load volunteers.",
+        );
+      }
+
+      if (!timeEntriesResponse.ok) {
+        throw new Error(
+          timeEntriesPayload.error ?? "Unable to load time entries.",
+        );
+      }
+
+      const volunteerMap = new Map(
+        (volunteersPayload.volunteers ?? []).map((volunteer) => [
+          volunteer.id,
+          `${volunteer.firstName} ${volunteer.lastName}`,
+        ]),
+      );
+
+      const nextEntries = (timeEntriesPayload.timeEntries ?? [])
+        .slice()
+        .sort(
+          (firstEntry, secondEntry) =>
+            new Date(secondEntry.clockIn).getTime() -
+            new Date(firstEntry.clockIn).getTime(),
+        )
+        .map((entry) => {
+          const clockInDate = new Date(entry.clockIn);
+          const clockOutDate = entry.clockOut ? new Date(entry.clockOut) : null;
+
+          return {
+            id: entry.id,
+            name: volunteerMap.get(entry.volunteerId) ?? "Unknown volunteer",
+            dateLabel: formatDateLabel(clockInDate),
+            clockInLabel: formatTimeLabel(clockInDate),
+            clockOutLabel: clockOutDate ? formatTimeLabel(clockOutDate) : "",
+            totalHours: clockOutDate
+              ? formatHours(entry.clockIn, entry.clockOut!)
+              : "",
+          };
+        });
+
+      setEntries(nextEntries);
+    } catch (loadError) {
+      setEntries([]);
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load volunteer log.",
+      );
+    }
   }
 
   useEffect(() => {
@@ -81,18 +197,18 @@ export default function AdminPage() {
 
   async function handleAddVolunteer() {
     const fullName = newVolunteerName.trim();
-  
+
     if (!fullName) return;
-  
+
     const parts = fullName.split(/\s+/);
     const firstName = parts[0];
     const lastName = parts.slice(1).join(" ");
-  
+
     if (!lastName) {
       setError("Please enter a first and last name.");
       return;
     }
-  
+
     const res = await fetch("/api/volunteers", {
       method: "POST",
       headers: {
@@ -103,13 +219,13 @@ export default function AdminPage() {
         lastName,
       }),
     });
-  
+
     if (!res.ok) {
       const data = await res.json().catch(() => null);
       setError(data?.error ?? "Failed to add volunteer.");
       return;
     }
-  
+
     setNewVolunteerName("");
     setShowModal(false);
   }
@@ -147,7 +263,7 @@ export default function AdminPage() {
             ) : null}
 
             <button
-              onClick={() => void handleLogin()}
+              onClick={handleLogin}
               disabled={isSubmitting}
               className="mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616] disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60"
             >
@@ -185,7 +301,7 @@ export default function AdminPage() {
                  Add New Volunteer
               </button>
           </div>
-              
+
 
             <div className="flex gap-3">
               <button
