@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -15,18 +16,31 @@ export default function Navbar() {
   const pathname = usePathname();
 
   return (
-    <nav className="border-b border-slate-200/70 bg-[#f8f6f1]/95 backdrop-blur-xl">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 md:flex-row md:items-center md:justify-between md:gap-8 md:py-5 lg:px-8">
-        <Link href="/" className="shrink-0 self-start md:self-auto">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#9a251d] sm:text-xs">
-            Gamecock Community Shop
-          </p>
-          <p className="text-base font-semibold text-slate-900 sm:text-lg">
-            Volunteer Check-In
-          </p>
+    <nav className="sticky top-0 z-50 border-b border-slate-200/70 bg-[#f4f4f4]/95 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-[#f4f4f4]/88">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
+        <Link
+          href="/"
+          className="flex w-full min-w-0 items-center gap-3 md:w-auto md:shrink-0"
+        >
+          <Image
+            src="/usc-logos/usc-logo-stacked.png"
+            alt="University of South Carolina"
+            width={44}
+            height={48}
+            className="h-auto w-10 shrink-0 sm:w-[44px]"
+          />
+
+          <div className="min-w-0">
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.18em] text-[#9a251d] sm:text-xs sm:tracking-[0.28em]">
+              Gamecock Community Shop
+            </p>
+            <p className="truncate text-sm font-semibold text-slate-950 sm:text-lg">
+              Volunteer Portal
+            </p>
+          </div>
         </Link>
 
-        <div className="-mx-1 flex w-full min-w-0 items-center gap-1 overflow-x-auto px-1 whitespace-nowrap [scrollbar-width:none] md:mx-0 md:w-auto md:justify-end md:px-0 [&::-webkit-scrollbar]:hidden">
+        <div className="grid w-full grid-cols-3 gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm md:flex md:w-auto md:border-0 md:bg-transparent md:p-0 md:shadow-none">
           {navItems.map(({ href, label }) => {
             const isActive =
               href === "/" ? pathname === href : pathname.startsWith(href);
@@ -36,10 +50,10 @@ export default function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  "relative shrink-0 px-3 py-2 text-sm font-semibold text-slate-600 transition-colors duration-200 sm:px-4 after:absolute after:bottom-0 after:left-3 after:h-0.5 after:w-[calc(100%-1.5rem)] after:origin-center after:rounded-full after:bg-[#9a251d] after:transition-transform after:duration-200 sm:after:left-4 sm:after:w-[calc(100%-2rem)]",
+                  "relative flex min-w-0 items-center justify-center rounded-xl px-3 py-2 text-sm font-semibold transition-colors duration-200 md:rounded-none md:px-4 after:absolute after:bottom-0 after:left-3 after:h-0.5 after:w-[calc(100%-1.5rem)] after:origin-center after:rounded-full after:bg-[#7a1c1c] after:transition-transform after:duration-200 md:after:left-4 md:after:w-[calc(100%-2rem)]",
                   isActive
-                    ? "text-[#9a251d] after:scale-x-100"
-                    : "after:scale-x-0 hover:text-slate-950 hover:after:scale-x-100",
+                    ? "bg-[#f8ecec] text-[#7a1c1c] md:bg-transparent after:scale-x-100"
+                    : "text-slate-600 after:scale-x-0 hover:bg-slate-50 hover:text-slate-950 md:hover:bg-transparent hover:after:scale-x-100",
                 )}
               >
                 {label}

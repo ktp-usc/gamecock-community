@@ -1,9 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Clock3 } from "lucide-react";
+import { toast } from "sonner";
 
 import type { VolunteerRecord } from "@/lib/api/volunteers";
 import { isOpenTimeEntry, type TimeEntryRecord } from "@/lib/time-entries";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Combobox,
   ComboboxContent,
@@ -12,6 +23,8 @@ import {
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 type VolunteerResponse = {
   volunteers?: VolunteerRecord[];
@@ -26,8 +39,6 @@ type TimeEntriesResponse = {
   timeEntries?: TimeEntryRecord[];
   error?: string;
 };
-
-type StatusTone = "clock-in" | "clock-out" | "";
 
 const PAGE_PASSWORD = "gamecock2026";
 const AUTH_KEY = "home-page-auth";
@@ -48,42 +59,59 @@ function PasswordScreen({
   onSubmit: () => void;
 }) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-4">
-      <div className="w-full max-w-[760px] rounded-[32px] bg-white px-10 py-12 shadow-2xl sm:px-12 sm:py-14">
-        <h1 className="text-center text-4xl font-bold text-[#a61c1c] sm:text-5xl">
-          Access Required
-        </h1>
-        <p className="mt-5 text-center text-lg text-neutral-600 sm:text-xl">
-          Enter the password to access this page.
-        </p>
+    <main className="bg-[#f4f4f4] px-4 pb-10 pt-8 sm:px-6 sm:pb-14 sm:pt-10">
+      <Card className="mx-auto w-full max-w-xl rounded-[28px] border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+        <CardHeader className="items-center gap-2 px-6 pt-7 text-center sm:px-10 sm:pt-8">
+          <CardTitle className="text-3xl text-[#7a1c1c] sm:text-4xl">
+            Volunteer Access
+          </CardTitle>
+          <CardDescription className="mx-auto max-w-md text-base leading-7 text-slate-600">
+            Enter the portal password to open the volunteer clock-in page.
+          </CardDescription>
+        </CardHeader>
 
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
+        <CardContent className="px-6 pb-7 pt-1 sm:px-10 sm:pb-8 sm:pt-2">
+            <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
               onSubmit();
-            }
-          }}
-          placeholder="Password"
-          className="mt-10 h-14 w-full rounded-2xl border border-neutral-300 px-5 text-lg outline-none transition focus:border-[#a61c1c] focus:ring-4 focus:ring-[#a61c1c]/10 sm:h-16 sm:text-xl"
-        />
+            }}
+          >
+            <div className="space-y-2 text-left">
+                <label
+                  htmlFor="home-password"
+                  className="text-sm font-semibold text-slate-900"
+                >
+                  Password
+              </label>
+              <Input
+                id="home-password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Enter password"
+                className="h-12 rounded-2xl border-slate-300 bg-white px-4 text-base shadow-none focus-visible:border-[#7a1c1c] focus-visible:ring-[#7a1c1c]/15"
+              />
+            </div>
 
-        {error ? (
-          <p className="mt-4 text-sm font-medium text-[#a61c1c] sm:text-base">
-            {error}
-          </p>
-        ) : null}
+            {error ? (
+              <Alert variant="destructive" className="border-red-200 text-left">
+                <AlertCircle className="size-4" />
+                <AlertTitle>Unable to continue</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            ) : null}
 
-        <button
-          type="button"
-          onClick={onSubmit}
-          className="mt-8 h-14 w-full rounded-2xl bg-[#a61c1c] text-xl font-semibold text-white transition hover:bg-[#8f1616] sm:h-16 sm:text-2xl"
-        >
-          Enter
-        </button>
-      </div>
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-2xl bg-[#7a1c1c] text-base font-semibold text-white hover:bg-[#651616]"
+            >
+              Enter
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }
@@ -98,8 +126,6 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
     useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
-  const [statusTone, setStatusTone] = useState<StatusTone>("");
 
   useEffect(() => {
     setTime(new Date().toLocaleTimeString());
@@ -121,7 +147,8 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
         const payload = (await response.json()) as VolunteerResponse;
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to load volunteers.");
+          setError(payload.error ?? "Unable to load volunteers.");
+          return;
         }
 
         setVolunteers(payload.volunteers ?? []);
@@ -171,7 +198,11 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
         const payload = (await response.json()) as TimeEntriesResponse;
 
         if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to load clock status.");
+          if (!isCancelled) {
+            setError(payload.error ?? "Unable to load clock status.");
+            setIsSelectedVolunteerClockedIn(null);
+          }
+          return;
         }
 
         if (!isCancelled) {
@@ -217,7 +248,7 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
   async function handleClockAction(
     endpoint: "/api/time-entries/clock-in" | "/api/time-entries/clock-out",
     actionLabel: "Clocked in" | "Clocked out",
-    tone: Exclude<StatusTone, "">,
+    nextClockedInState: boolean,
   ) {
     if (!selectedVolunteerId) {
       return;
@@ -225,9 +256,6 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
 
     try {
       setIsSubmitting(true);
-      setError("");
-      setStatusMessage("");
-      setStatusTone("");
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -240,61 +268,76 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
       const payload = (await response.json()) as ClockResponse;
 
       if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to save time entry.");
+        toast.error(payload.error ?? "Unable to save time entry.");
+        return;
       }
 
       const volunteerName = selectedVolunteer
         ? getVolunteerLabel(selectedVolunteer)
         : "Volunteer";
 
-      setStatusMessage(`${actionLabel}: ${volunteerName}`);
-      setStatusTone(tone);
-      setIsSelectedVolunteerClockedIn(tone === "clock-in");
+      toast.success(`${actionLabel}: ${volunteerName}`);
+      setIsSelectedVolunteerClockedIn(nextClockedInState);
     } catch (submitError) {
-      setError(
+      toast.error(
         submitError instanceof Error
           ? submitError.message
           : "Unable to save time entry.",
       );
-      setStatusTone("");
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={onLogout}
-        className="fixed right-4 top-4 z-50 rounded-lg bg-neutral-900 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-neutral-700"
-      >
-        Logout
-      </button>
+    <main className="bg-[#f4f4f4] px-4 pb-10 pt-8 sm:px-6 sm:pb-14 sm:pt-10">
+      <div className="mx-auto mb-4 flex w-full max-w-3xl justify-end">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={onLogout}
+          className="rounded-2xl border border-slate-200 bg-white px-5 text-slate-700 shadow-sm hover:bg-slate-50"
+        >
+          Logout
+        </Button>
+      </div>
 
-      <main className="min-h-screen bg-[#f4f4f4] px-4 py-10 sm:px-6 sm:py-16">
-        <div className="mx-auto w-full max-w-3xl rounded-[32px] border border-[#4a90e2] bg-white p-6 text-center shadow-[0_14px_30px_rgba(0,0,0,0.12)] sm:p-10">
-          <h1 className="text-3xl font-semibold text-[#7a1c1c] sm:text-5xl">
+      <Card className="mx-auto w-full max-w-3xl overflow-hidden rounded-[28px] border-slate-200 bg-white text-center shadow-[0_18px_48px_rgba(15,23,42,0.08)]">
+        <CardHeader className="items-center gap-2 px-6 pt-6 sm:px-10 sm:pt-7">
+          <CardTitle className="text-3xl text-[#7a1c1c] sm:text-4xl">
             Gamecock Community Shop
-          </h1>
-
-          <h2 className="mt-6 text-2xl font-semibold text-slate-950 sm:text-4xl">
+          </CardTitle>
+          <p className="text-xl font-semibold text-slate-950 sm:text-3xl">
             Volunteer Clock-In
-          </h2>
+          </p>
+          <CardDescription className="mx-auto max-w-xl text-center text-sm leading-6 text-slate-600 sm:text-base">
+            Select your name, then clock in or clock out for your shift.
+          </CardDescription>
+        </CardHeader>
 
-          <div className="mt-6 text-4xl font-light text-slate-950 sm:text-6xl">
-            {time || "--:--:--"}
+        <CardContent className="space-y-6 px-6 py-5 sm:px-10 sm:py-7">
+          <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-5 py-4 text-center shadow-sm">
+            <div className="flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 sm:text-sm">
+              <Clock3 className="size-4 text-[#7a1c1c]" />
+              Current Time
+            </div>
+            <div className="mt-2 text-4xl font-light tracking-tight text-slate-950 sm:text-5xl">
+              {time || "--:--:--"}
+            </div>
           </div>
 
-          <hr className="my-8 border-slate-200" />
+          <Separator />
 
           <div className="text-left">
             <label
               htmlFor="volunteer-combobox"
-              className="mb-3 block text-2xl font-semibold text-slate-950"
+              className="mb-3 block text-lg font-semibold text-slate-950 sm:text-xl"
             >
               Select Your Name
             </label>
+            <p className="mb-4 text-sm leading-6 text-slate-600">
+              Start typing to search for your record, then choose your name from the list.
+            </p>
 
             <Combobox
               items={sortedVolunteers}
@@ -331,71 +374,62 @@ function HomeContent({ onLogout }: { onLogout: () => void }) {
           </div>
 
           {error ? (
-            <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-              {error}
-            </p>
+            <Alert variant="destructive" className="text-left">
+              <AlertCircle className="size-4" />
+              <AlertTitle>Unable to continue</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           ) : null}
 
-          {statusMessage ? (
-            <p
-              className={`mt-4 rounded-2xl px-4 py-3 text-sm font-medium ${
-                statusTone === "clock-out"
-                  ? "bg-amber-50 text-amber-700"
-                  : "bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {statusMessage}
-            </p>
-          ) : null}
-
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-            <button
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Button
               type="button"
+              size="lg"
               onClick={() =>
                 void handleClockAction(
                   "/api/time-entries/clock-in",
                   "Clocked in",
-                  "clock-in",
+                  true,
                 )
               }
               disabled={!canClockIn}
-              className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
+              className="h-16 w-full min-w-0 rounded-[24px] bg-[#7a1c1c] text-xl font-semibold text-white shadow-[0_14px_28px_rgba(122,28,28,0.16)] hover:bg-[#651616]"
             >
-              Clock In
-            </button>
+              {isSubmitting ? "Saving..." : "Clock In"}
+            </Button>
 
-            <button
+            <Button
               type="button"
+              size="lg"
               onClick={() =>
                 void handleClockAction(
                   "/api/time-entries/clock-out",
                   "Clocked out",
-                  "clock-out",
+                  false,
                 )
               }
               disabled={!canClockOut}
-              className="cursor-pointer w-full rounded-2xl bg-[#7a1c1c] px-6 py-4 text-2xl font-semibold text-white transition hover:bg-[#651616] disabled:cursor-not-allowed disabled:bg-[#7a1c1c]/50"
+              className="h-16 w-full min-w-0 rounded-[24px] border border-slate-300 bg-white text-xl font-semibold text-slate-950 shadow-sm hover:bg-slate-50"
             >
-              Clock Out
-            </button>
+              {isSubmitting ? "Saving..." : "Clock Out"}
+            </Button>
           </div>
-        </div>
-      </main>
-    </>
+        </CardContent>
+      </Card>
+    </main>
   );
 }
 
 export default function Home() {
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+
+    return window.localStorage.getItem(AUTH_KEY) === "true";
+  });
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    const savedAuth = window.localStorage.getItem(AUTH_KEY);
-    if (savedAuth === "true") {
-      setAuthenticated(true);
-    }
-  }, []);
 
   function handleLogin() {
     if (password !== PAGE_PASSWORD) {
@@ -429,5 +463,3 @@ export default function Home() {
 
   return <HomeContent onLogout={handleLogout} />;
 }
-
-

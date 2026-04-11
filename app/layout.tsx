@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import { Manrope } from "next/font/google";
 import React from "react";
-import Navbar from "@/components/navbar";
-import Footer from "@/components/footer";
 
+import Footer from "@/components/footer";
+import Navbar from "@/components/navbar";
+import { Toaster } from "@/components/ui/sonner";
+
+import "./globals.css";
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  variable: "--font-manrope",
+});
 
 export const metadata: Metadata = {
-  title: "Gamecock CommUnity Shop Volunteer Tracker",
-  description: "CommUnity Shop Volunteer Tracker % Tutorial",
+  title: "Gamecock Community Shop Volunteer Portal",
+  description: "Volunteer clock-in, tutorial, and admin time tracking portal.",
 };
 
 export default function RootLayout({
@@ -15,10 +23,13 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen overflow-x-hidden bg-[#f8f6f1]">
-          <Navbar />
-          {children}
-          <Footer />
+      <body
+        className={`${manrope.variable} flex min-h-screen flex-col overflow-x-hidden bg-[#f4f4f4] font-[family:var(--font-manrope)] text-slate-950 antialiased`}
+      >
+        <Navbar />
+        <div className="flex-1">{children}</div>
+        <Footer />
+        <Toaster position="top-center" richColors />
       </body>
     </html>
   );
