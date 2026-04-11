@@ -6,8 +6,8 @@ import Footer from "@/components/footer";
 
 
 export const metadata: Metadata = {
-  title: "Future KTP Web App",
-  description: "KTP SP26",
+  title: "Gamecock CommUnity Shop Volunteer Tracker",
+  description: "CommUnity Shop Volunteer Tracker % Tutorial",
 };
 
 export default function RootLayout({

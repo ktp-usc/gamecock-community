@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ADMIN_AUTH_KEY,
-  ADMIN_PASSWORD,
 } from "@/lib/volunteer-log";
 import type { VolunteerRecord } from "@/lib/api/volunteers";
 import type { TimeEntryRecord } from "@/lib/time-entries";
@@ -61,12 +60,26 @@ function formatHours(startISO: string, endISO: string) {
   return `${hours}h ${minutes}m`; // otherwise show hours and minutes
 }
 
+type LoginResponse = {
+  ok?: boolean;
+  error?: string;
+};
+
 export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
   const [entries, setEntries] = useState<VolunteerLogEntry[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [newVolunteerName, setNewVolunteerName] = useState("");
+  const currentDate = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date())
+
 
   async function refreshEntries() {
     try {
@@ -141,21 +154,38 @@ export default function AdminPage() {
       window.localStorage.getItem(ADMIN_AUTH_KEY) === "true";
 
     setAuthenticated(isAuthed);
-    if (isAuthed) {
-      void refreshEntries();
-    }
+    if (isAuthed) refreshEntries();
   }, []);
 
-  function handleLogin() {
-    if (password !== ADMIN_PASSWORD) {
-      setError("Incorrect password.");
-      return;
-    }
+  async function handleLogin() {
+    try {
+      setIsSubmitting(true);
+      setError("");
 
-    window.localStorage.setItem(ADMIN_AUTH_KEY, "true");
-    setAuthenticated(true);
-    setError("");
-    void refreshEntries();
+      const response = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password }),
+      });
+
+      const payload = (await response.json()) as LoginResponse;
+
+      if (!response.ok) {
+        setError(payload.error ?? "Unable to sign in.");
+        return;
+      }
+
+      window.localStorage.setItem(ADMIN_AUTH_KEY, "true");
+      setAuthenticated(true);
+      setError("");
+      refreshEntries();
+    } catch {
+      setError("Unable to sign in.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function handleLogout() {
@@ -163,6 +193,41 @@ export default function AdminPage() {
     setAuthenticated(false);
     setPassword("");
     setSearch("");
+  }
+
+  async function handleAddVolunteer() {
+    const fullName = newVolunteerName.trim();
+
+    if (!fullName) return;
+
+    const parts = fullName.split(/\s+/);
+    const firstName = parts[0];
+    const lastName = parts.slice(1).join(" ");
+
+    if (!lastName) {
+      setError("Please enter a first and last name.");
+      return;
+    }
+
+    const res = await fetch("/api/volunteers", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        firstName,
+        lastName,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setError(data?.error ?? "Failed to add volunteer.");
+      return;
+    }
+
+    setNewVolunteerName("");
+    setShowModal(false);
   }
 
   const filteredEntries = useMemo(() => {
@@ -199,9 +264,10 @@ export default function AdminPage() {
 
             <button
               onClick={handleLogin}
-              className="mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616]"
+              disabled={isSubmitting}
+              className="mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616] disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60"
             >
-              Enter
+              {isSubmitting ? "Checking..." : "Enter"}
             </button>
           </section>
         </div>
@@ -210,27 +276,36 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-black px-4 py-10 text-neutral-900">
+    <main className="min-h-screen bg-[#f4f4f4] px-4 py-10 text-neutral-900">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center">
         <section className="admin-card w-full">
           <div className="flex flex-col items-center gap-2 text-center">
             <h1 className="text-4xl font-bold tracking-tight text-[#a61c1c] sm:text-5xl">
               Volunteer Time Log
             </h1>
-            <p className="text-xl text-neutral-700">March 2026</p>
+            <p className="text-3xl text-neutral-700">{currentDate}</p>
           </div>
 
           <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex w-full gap-3 sm:max-w-md">
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search volunteer name"
               className="w-full rounded-2xl border border-neutral-300 bg-white px-5 py-3 text-lg outline-none focus:border-[#a61c1c] focus:ring-4 focus:ring-[#a61c1c]/10 sm:max-w-sm"
             />
+            <button
+               onClick={() => setShowModal(true)}
+              className="rounded-2xl bg-[#a61c1c] px-5 py-3 text-sm font-semibold text-white hover:bg-[#8f1616]"
+                >
+                 Add New Volunteer
+              </button>
+          </div>
+
 
             <div className="flex gap-3">
               <button
-                onClick={() => void refreshEntries()}
+                onClick={refreshEntries}
                 className="rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700"
               >
                 Refresh
@@ -278,6 +353,42 @@ export default function AdminPage() {
               </table>
             </div>
           </div>
+
+          {showModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+      <h2 className="text-2xl font-bold text-[#a61c1c]">
+        Add New Volunteer
+      </h2>
+
+      <input
+        value={newVolunteerName}
+        onChange={(e) => setNewVolunteerName(e.target.value)}
+        placeholder="Volunteer name"
+        className="mt-4 w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-[#a61c1c]"
+      />
+
+      <div className="mt-6 flex justify-end gap-3">
+        <button
+          onClick={() => {
+            setShowModal(false);
+            setNewVolunteerName("");
+          }}
+          className="rounded-xl bg-neutral-300 px-4 py-2"
+        >
+          Cancel
+        </button>
+
+        <button
+          onClick={handleAddVolunteer}
+          className="rounded-xl bg-[#a61c1c] px-4 py-2 text-white"
+        >
+          Add
+        </button>
+      </div>
+    </div>
+  </div>
+)}
         </section>
       </div>
     </main>
