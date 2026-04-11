@@ -14,9 +14,8 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Gamecock Community Shop Volunteer Portal",
-  description:
-    "Volunteer check-in, training, and time tracking for the Gamecock Community Shop.",
+  title: "Gamecock CommUnity Shop Volunteer Tracker",
+  description: "CommUnity Shop Volunteer Tracker % Tutorial",
 };
 
 export default function RootLayout({

@@ -1,0 +1,447 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+
+import { authClient } from '@/lib/auth/client';
+import type { VolunteerRecord } from '@/lib/api/volunteers';
+import type { TimeEntryRecord } from '@/lib/time-entries';
+
+type AdminPageClientProps = {
+  adminEmail: string;
+  initialAuthenticated: boolean;
+};
+
+type VolunteerLogEntry = {
+  id: string;
+  name: string;
+  dateLabel: string;
+  clockInLabel: string;
+  clockOutLabel: string;
+  totalHours: string;
+};
+
+type VolunteersResponse = {
+  volunteers?: VolunteerRecord[];
+  error?: string;
+};
+
+type TimeEntriesResponse = {
+  timeEntries?: TimeEntryRecord[];
+  error?: string;
+};
+
+function formatDateLabel(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: '2-digit',
+  }).format(date);
+}
+
+function formatTimeLabel(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function formatHours(startISO: string, endISO: string) {
+  const start = new Date(startISO).getTime();
+  const end = new Date(endISO).getTime();
+  const totalMinutes = Math.max(0, Math.round((end - start) / 60_000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+
+  return `${hours}h ${minutes}m`;
+}
+
+export default function AdminPageClient({
+                                          adminEmail,
+                                          initialAuthenticated,
+                                        }: AdminPageClientProps) {
+  const [password, setPassword] = useState('');
+  const [authenticated, setAuthenticated] = useState(initialAuthenticated);
+  const [entries, setEntries] = useState<VolunteerLogEntry[]>([]);
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isAddingVolunteer, setIsAddingVolunteer] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [newVolunteerName, setNewVolunteerName] = useState('');
+
+  const currentMonthYear = new Date().toLocaleString('en-US', {
+    month: 'long',
+    year: 'numeric',
+  });
+
+  async function refreshEntries() {
+    try {
+      setIsRefreshing(true);
+      setError('');
+
+      const [volunteersResponse, timeEntriesResponse] = await Promise.all([
+        fetch('/api/volunteers', {
+          method: 'GET',
+          cache: 'no-store',
+        }),
+        fetch('/api/time-entries', {
+          method: 'GET',
+          cache: 'no-store',
+        }),
+      ]);
+
+      const volunteersPayload =
+          (await volunteersResponse.json()) as VolunteersResponse;
+      const timeEntriesPayload =
+          (await timeEntriesResponse.json()) as TimeEntriesResponse;
+
+      if (!volunteersResponse.ok) {
+        throw new Error(volunteersPayload.error ?? 'Unable to load volunteers.');
+      }
+
+      if (!timeEntriesResponse.ok) {
+        throw new Error(timeEntriesPayload.error ?? 'Unable to load time entries.');
+      }
+
+      const volunteerMap = new Map(
+          (volunteersPayload.volunteers ?? []).map((volunteer) => [
+            volunteer.id,
+            `${volunteer.firstName} ${volunteer.lastName}`.trim(),
+          ]),
+      );
+
+      const nextEntries: VolunteerLogEntry[] = (timeEntriesPayload.timeEntries ?? [])
+          .slice()
+          .sort(
+              (firstEntry, secondEntry) =>
+                  new Date(secondEntry.clockIn).getTime() -
+                  new Date(firstEntry.clockIn).getTime(),
+          )
+          .map((entry) => {
+            const clockInDate = new Date(entry.clockIn);
+            const clockOutDate = entry.clockOut ? new Date(entry.clockOut) : null;
+
+            return {
+              id: entry.id,
+              name: volunteerMap.get(entry.volunteerId) ?? 'Unknown volunteer',
+              dateLabel: formatDateLabel(clockInDate),
+              clockInLabel: formatTimeLabel(clockInDate),
+              clockOutLabel: clockOutDate ? formatTimeLabel(clockOutDate) : '',
+              totalHours: (clockOutDate && entry.clockOut) ? formatHours(entry.clockIn, entry.clockOut) : '',
+            };
+          });
+
+      setEntries(nextEntries);
+    } catch (loadError) {
+      setEntries([]);
+      setError(
+          loadError instanceof Error
+              ? loadError.message
+              : 'Unable to load volunteer log.',
+      );
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    if (authenticated) {
+      void refreshEntries();
+      return;
+    }
+
+    setEntries([]);
+  }, [authenticated]);
+
+  async function handleLogin() {
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      if (!adminEmail) {
+        setError('Admin email is not configured.');
+        return;
+      }
+
+      const result = await authClient.signIn.email({
+        email: adminEmail,
+        password,
+      });
+
+      if (result.error) {
+        setError(result.error.message ?? 'Unable to sign in.');
+        return;
+      }
+
+      setAuthenticated(true);
+      setPassword('');
+      await refreshEntries();
+    } catch {
+      setError('Unable to sign in.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      setIsSubmitting(true);
+      setError('');
+
+      const result = await authClient.signOut();
+
+      if (result.error) {
+        setError(result.error.message ?? 'Unable to log out.');
+        return;
+      }
+
+      setAuthenticated(false);
+      setEntries([]);
+      setPassword('');
+      setSearch('');
+      setShowModal(false);
+      setNewVolunteerName('');
+    } catch {
+      setError('Unable to log out.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleAddVolunteer() {
+    try {
+      setIsAddingVolunteer(true);
+      setError('');
+
+      const fullName = newVolunteerName.trim();
+
+      if (!fullName) {
+        setError('Please enter a volunteer name.');
+        return;
+      }
+
+      const parts = fullName.split(/\s+/);
+      const firstName = parts[0];
+      const lastName = parts.slice(1).join(' ');
+
+      if (!lastName) {
+        setError('Please enter a first and last name.');
+        return;
+      }
+
+      const response = await fetch('/api/volunteers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+        }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+            | { error?: string }
+            | null;
+
+        setError(payload?.error ?? 'Failed to add volunteer.');
+        return;
+      }
+
+      setNewVolunteerName('');
+      setShowModal(false);
+      await refreshEntries();
+    } catch {
+      setError('Failed to add volunteer.');
+    } finally {
+      setIsAddingVolunteer(false);
+    }
+  }
+
+  const filteredEntries = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return entries;
+    return entries.filter((entry) => entry.name.toLowerCase().includes(q));
+  }, [entries, search]);
+
+  if (!authenticated) {
+    return (
+        <main className='min-h-screen bg-black px-4 py-12 text-white'>
+          <div className='mx-auto flex min-h-[calc(100vh-6rem)] max-w-xl items-center justify-center'>
+            <section className='w-full rounded-[28px] bg-white p-8 text-neutral-900 shadow-2xl'>
+              <h1 className='text-center text-4xl font-bold text-[#a61c1c]'>
+                Admin Access
+              </h1>
+              <p className='mt-4 text-center text-lg text-neutral-600'>
+                Enter the admin password to view the volunteer log.
+              </p>
+
+              <input
+                  type='password'
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder='Password'
+                  className='mt-8 w-full rounded-2xl border border-neutral-300 px-5 py-4 text-lg outline-none focus:border-[#a61c1c] focus:ring-4 focus:ring-[#a61c1c]/10'
+              />
+
+              {error ? (
+                  <p className='mt-3 text-sm font-medium text-[#a61c1c]'>
+                    {error}
+                  </p>
+              ) : null}
+
+              <button
+                  onClick={() => void handleLogin()}
+                  disabled={isSubmitting}
+                  className='mt-8 w-full rounded-2xl bg-[#a61c1c] py-4 text-xl font-semibold text-white transition hover:bg-[#8f1616] disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60'
+              >
+                {isSubmitting ? 'Checking...' : 'Enter'}
+              </button>
+            </section>
+          </div>
+        </main>
+    );
+  }
+
+  return (
+      <main className='min-h-screen bg-[#f4f4f4] px-4 py-10 text-neutral-900'>
+        <div className='mx-auto flex min-h-[calc(100vh-5rem)] max-w-6xl items-center justify-center'>
+          <section className='admin-card w-full'>
+            <div className='flex flex-col items-center gap-2 text-center'>
+              <h1 className='text-4xl font-bold tracking-tight text-[#a61c1c] sm:text-5xl'>
+                Volunteer Time Log
+              </h1>
+              <p className='text-xl text-neutral-700'>{currentMonthYear}</p>
+            </div>
+
+            <div className='mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
+              <div className='flex w-full gap-3 sm:max-w-md'>
+                <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder='Search volunteer name'
+                    className='w-full rounded-2xl border border-neutral-300 bg-white px-5 py-3 text-lg outline-none focus:border-[#a61c1c] focus:ring-4 focus:ring-[#a61c1c]/10 sm:max-w-sm'
+                />
+                <button
+                    onClick={() => setShowModal(true)}
+                    className='rounded-2xl bg-[#a61c1c] px-5 py-3 text-sm font-semibold text-white hover:bg-[#8f1616]'
+                >
+                  Add New Volunteer
+                </button>
+              </div>
+
+              <div className='flex gap-3'>
+                <button
+                    onClick={() => void refreshEntries()}
+                    disabled={isRefreshing}
+                    className='rounded-2xl bg-neutral-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-500'
+                >
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                </button>
+                <button
+                    onClick={() => void handleLogout()}
+                    disabled={isSubmitting}
+                    className='rounded-2xl bg-[#a61c1c] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#8f1616] disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60'
+                >
+                  Logout
+                </button>
+              </div>
+            </div>
+
+            {error ? (
+                <p className='mt-4 text-sm font-medium text-[#a61c1c]'>{error}</p>
+            ) : null}
+
+            <div className='mt-8 overflow-hidden rounded-[10px] border border-neutral-300 bg-white shadow-sm'>
+              <div className='overflow-x-auto'>
+                <table className='admin-table min-w-full'>
+                  <thead>
+                  <tr className='bg-[#a61c1c] text-white'>
+                    <th>Name</th>
+                    <th>Date</th>
+                    <th>Clock In</th>
+                    <th>Clock Out</th>
+                    <th>Total Hours</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  {filteredEntries.length === 0 ? (
+                      <tr>
+                        <td
+                            colSpan={5}
+                            className='px-6 py-10 text-center text-lg text-neutral-500'
+                        >
+                          No volunteer entries yet.
+                        </td>
+                      </tr>
+                  ) : (
+                      filteredEntries.map((entry, index) => (
+                          <tr
+                              key={entry.id}
+                              className={index % 2 === 0 ? 'even' : 'odd'}
+                          >
+                            <td>{entry.name}</td>
+                            <td>{entry.dateLabel}</td>
+                            <td>{entry.clockInLabel}</td>
+                            <td>{entry.clockOutLabel || '-'}</td>
+                            <td>{entry.totalHours || 'In progress'}</td>
+                          </tr>
+                      ))
+                  )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {showModal && (
+                <div className='fixed inset-0 z-50 flex items-center justify-center bg-black/50'>
+                  <div className='w-full max-w-md rounded-2xl bg-white p-6 shadow-xl'>
+                    <h2 className='text-2xl font-bold text-[#a61c1c]'>
+                      Add New Volunteer
+                    </h2>
+
+                    <input
+                        value={newVolunteerName}
+                        onChange={(e) => setNewVolunteerName(e.target.value)}
+                        placeholder='Volunteer name'
+                        className='mt-4 w-full rounded-xl border border-neutral-300 px-4 py-3 outline-none focus:border-[#a61c1c]'
+                    />
+
+                    <div className='mt-6 flex justify-end gap-3'>
+                      <button
+                          onClick={() => {
+                            setShowModal(false);
+                            setNewVolunteerName('');
+                          }}
+                          disabled={isAddingVolunteer}
+                          className='rounded-xl bg-neutral-300 px-4 py-2'
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                          onClick={() => void handleAddVolunteer()}
+                          disabled={isAddingVolunteer}
+                          className='rounded-xl bg-[#a61c1c] px-4 py-2 text-white disabled:cursor-not-allowed disabled:bg-[#a61c1c]/60'
+                      >
+                        {isAddingVolunteer ? 'Adding...' : 'Add'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+            )}
+          </section>
+        </div>
+      </main>
+  );
+}
